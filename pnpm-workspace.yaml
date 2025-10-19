@@ -1,0 +1,6 @@
+packages:
+  - '.'
+  - 'api'
+  - 'core/*'
+  - 'explorer/*'
+  - 'sdk/js'

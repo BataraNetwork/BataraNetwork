@@ -1,0 +1,13 @@
+{
+  "name": "bataranetwork-api",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@google/genai": "^1.25.0",
+    "@vercel/node": "^5.4.0",
+    "crypto": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12"
+  }
+}
