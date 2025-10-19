@@ -1,0 +1,17 @@
+
+{
+  "name": "bataranetwork-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Full Modular Blockchain Ecosystem",
+  "scripts": {
+    "build:node": "pnpm --filter bataranetwork-node build",
+    "test:node": "pnpm --filter bataranetwork-node test",
+    "start:node": "pnpm --filter bataranetwork-node start",
+    "dev:explorer": "pnpm --filter explorer-frontend dev & pnpm --filter explorer-backend dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "packageManager": "pnpm@8.6.0"
+}

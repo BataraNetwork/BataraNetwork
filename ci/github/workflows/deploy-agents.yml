@@ -1,0 +1,39 @@
+# ci/github/workflows/deploy-agents.yml
+name: Build and Deploy AI Agents
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'agents/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'agents/**'
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./agents
+        push: ${{ github.ref == 'refs/heads/main' }}
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/bataranetwork-agents:latest
+          ghcr.io/${{ github.repository_owner }}/bataranetwork-agents:${{ github.sha }}

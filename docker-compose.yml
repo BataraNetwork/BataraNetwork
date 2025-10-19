@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  bataranetwork-node:
+    build:
+      context: ./core/node
+    container_name: bataranetwork_node
+    restart: always
+    ports:
+      - "3000:3000"    # HTTP RPC
+      - "50051:50051"  # gRPC
+      - "6001:6001"    # P2P
+      - "9100:9100"    # Prometheus Metrics
+    volumes:
+      - bataradata:/app/data # Persistent LevelDB storage
+    environment:
+      - NODE_ENV=production
+      - P2P_PORT=6001
+
+  explorer-backend:
+    build:
+      context: ./explorer/backend
+    container_name: explorer_backend
+    restart: always
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./explorer/backend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - NODE_API_URL=http://bataranetwork-node:3000
+    depends_on:
+      - bataranetwork-node
+
+  explorer-frontend:
+    build:
+      context: ./explorer/frontend
+      dockerfile: Dockerfile.dev
+    container_name: explorer_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./explorer/frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:4000/api # Accessed from host browser
+    depends_on:
+      - explorer-backend
+
+  agents:
+    build:
+      context: ./agents
+    container_name: bataranetwork_agents
+    restart: always
+    ports:
+      - "8000:8000"
+
+  prometheus:
+    image: prom/prometheus:v2.37.0
+    container_name: prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    depends_on:
+      - bataranetwork-node
+
+volumes:
+  bataradata:

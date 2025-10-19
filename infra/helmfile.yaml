@@ -1,0 +1,23 @@
+# helmfile.yaml
+# This file manages multiple Helm releases for the Bataranetwork ecosystem.
+
+repositories:
+  - name: stable
+    url: https://charts.helm.sh/stable
+
+releases:
+  # Example release for the AI Agents
+  - name: batara-agents
+    namespace: bataranetwork
+    chart: ./helm/batara-agents
+    values:
+      - ./helm/batara-agents/values.yaml
+      # You can override values for different environments here
+      # - values.yaml.gotmpl
+
+  # Placeholder for the main Bataranetwork node release
+  - name: bataranetwork-node
+    namespace: bataranetwork
+    chart: ./helm/bataranetwork-node # This chart needs to be created
+    values:
+      - replicaCount: 3

@@ -1,0 +1,7 @@
+# infra/helm/batara-agents/Chart.yaml
+apiVersion: v2
+name: batara-agents
+description: A Helm chart for deploying the Bataranetwork AI agents.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

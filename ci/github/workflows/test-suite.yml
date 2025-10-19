@@ -1,0 +1,35 @@
+name: Run Test Suite
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  run-node-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./core/node
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+        cache: 'npm'
+        cache-dependency-path: core/node/package-lock.json
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run tests
+      run: npm test
+
+  # You can add more jobs here for other modules like the Python agents
+  # run-agent-tests:
+  #   ...

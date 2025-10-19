@@ -1,0 +1,43 @@
+stages:
+  - lint
+  - test
+  - build
+
+# --- LINT JOBS ---
+lint:node:
+  stage: lint
+  image: node:20
+  script:
+    - cd core/node
+    - npm install
+    - npm run lint
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        - core/node/**/*
+
+# --- TEST JOBS ---
+test:node:
+  stage: test
+  image: node:20
+  script:
+    - cd core/node
+    - npm install
+    - npm test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        - core/node/**/*
+
+# --- BUILD JOBS ---
+build:node:
+  stage: build
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  script:
+    - echo "Building node Docker image..."
+    # In a real scenario, you would log in to a registry and push the image
+    - docker build -t bataranetwork-node:latest ./core/node
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

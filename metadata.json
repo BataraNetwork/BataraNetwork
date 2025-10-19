@@ -1,0 +1,5 @@
+{
+  "name": "Bataranetwork DevOps Dashboard",
+  "description": "A comprehensive dashboard to generate, view, and manage DevOps configurations for a Bataranetwork blockchain node. It provides tools for CI/CD, containerization, deployment, and real-time monitoring visualizations.",
+  "requestFramePermissions": []
+}
