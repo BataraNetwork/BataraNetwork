@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 // FIX: Changed to a standard import to use TransactionType enum as a value, and used `type` keyword for type-only imports.
-import { BataraClient, TransactionType, type Transaction, type TransferTransaction, type StakeTransaction, type ContractCreationTransaction, type GovernanceProposalTransaction, type GovernanceVoteTransaction } from '../../../sdk/js/src/index';
+import { BataraClient, TransactionType, type Transaction, type TransferTransaction, type StakeTransaction, type ContractCreationTransaction, type GovernanceProposalTransaction, type GovernanceVoteTransaction, type ContractCallTransaction } from '../../../sdk/js/src/index';
 import * as crypto from './crypto';
 import process from 'process';
 
@@ -197,6 +197,45 @@ program
       } catch (error: any) {
           console.error('Error deploying contract:', error.message);
       }
+  });
+
+program
+  .command('call-contract')
+  .description('Call a function on a deployed smart contract')
+  .requiredOption('-w, --wallet <path>', 'Path to the caller wallet file')
+  .requiredOption('-cid, --contract-id <id>', 'The ID of the contract to call')
+  .requiredOption('--function <name>', 'The name of the function to call')
+  .requiredOption('-n, --nonce <number>', 'The next nonce for the sender account')
+  .option('-a, --args <json_array>', 'Arguments for the function as a JSON array string', '[]')
+  .option('-f, --fee <number>', 'Transaction fee', '0')
+  .action(async (options) => {
+    try {
+        let args: any[] = [];
+        try {
+            args = JSON.parse(options.args);
+            if (!Array.isArray(args)) throw new Error();
+        } catch (e) {
+            throw new Error(`Invalid JSON for arguments. Please provide a valid JSON array string, e.g., '["hello", 42]'.`);
+        }
+        
+        const transaction = createSignedTransaction(options.wallet, {
+            type: TransactionType.CONTRACT_CALL,
+            contractId: options.contractId,
+            function: options.function,
+            args,
+            nonce: parseInt(options.nonce, 10),
+            fee: parseFloat(options.fee),
+        });
+
+        console.log('Broadcasting contract call:', JSON.stringify(transaction, null, 2));
+
+        const result = await client.callContract(transaction as ContractCallTransaction);
+        console.log('Broadcast result:', result);
+        console.log(`\nContract call transaction sent. Its ID is ${transaction.id}`);
+
+    } catch (error: any) {
+        console.error('Error calling contract:', error.message);
+    }
   });
 
 // --- Governance Commands ---

@@ -10,6 +10,7 @@ describe('useNodeStatus', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+    jest.restoreAllMocks(); // Restore all mocks after each test
   });
 
   it('should initialize with a default active node', () => {
@@ -33,30 +34,38 @@ describe('useNodeStatus', () => {
     expect(result.current.history.length).toBe(1);
   });
 
-  it('should generate a critical CPU alert when usage exceeds 85%', () => {
+  it('should generate and clear alerts based on metric thresholds', () => {
     const { result } = renderHook(() => useNodeStatus());
 
-    // Force CPU to go high
+    // --- Part 1: Generate Alert ---
+    let randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.9); // Force metric to increase
+
     act(() => {
-      // This is a bit of a hack since the internal state is not exposed.
-      // We advance time many times to increase the chance of random high CPU.
-      // A better way would be to refactor the hook to be more testable.
-      // For this test, we'll spy on Math.random.
-      // FIX: Replaced `global.Math` with `Math` to resolve "Cannot find name 'global'" error.
-      jest.spyOn(Math, 'random').mockReturnValue(0.9); // Will cause CPU to increase
-    });
-    
-    act(() => {
-        // Run enough intervals to push CPU over the threshold
+        // Run enough intervals to push CPU over the 85% threshold
         for (let i = 0; i < 20; i++) {
             jest.advanceTimersByTime(2000);
         }
     });
 
-    const cpuAlert = result.current.alerts.find(a => a.id.includes('-cpu'));
+    let cpuAlert = result.current.alerts.find(a => a.id.includes('-cpu') && a.status === 'active');
     expect(cpuAlert).toBeDefined();
     expect(cpuAlert?.severity).toBe('critical');
     expect(result.current.status.cpuUsage).toBeGreaterThan(85);
+
+    // --- Part 2: Clear Alert ---
+    randomSpy.mockReturnValue(0.1); // Force metric to decrease
+
+    act(() => {
+        // Run enough intervals to push CPU below the threshold
+        for (let i = 0; i < 20; i++) {
+            jest.advanceTimersByTime(2000);
+        }
+    });
+    
+    // The alert is now gone from the incoming alerts
+    cpuAlert = result.current.alerts.find(a => a.id.includes('-cpu') && a.status === 'active');
+    expect(cpuAlert).toBeUndefined(); 
+    expect(result.current.status.cpuUsage).toBeLessThanOrEqual(85);
   });
   
   it('should change the active node and update its status', () => {

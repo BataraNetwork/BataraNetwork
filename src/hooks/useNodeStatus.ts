@@ -47,19 +47,20 @@ export const useNodeStatus = () => {
         // Check for new alerts
         setAlerts(prevAlerts => {
             let currentAlerts = [...prevAlerts];
-            const hasCpuAlert = currentAlerts.some(a => a.id === `${activeNodeId}-cpu`);
-            const hasMemAlert = currentAlerts.some(a => a.id === `${activeNodeId}-mem`);
+            const hasCpuAlert = currentAlerts.some(a => a.id === `${activeNodeId}-cpu` && a.status === 'active');
+            const hasMemAlert = currentAlerts.some(a => a.id === `${activeNodeId}-mem` && a.status === 'active');
 
             if (newCpu > 85 && !hasCpuAlert) {
                 currentAlerts.push({ id: `${activeNodeId}-cpu`, nodeId: activeNodeId, severity: 'critical', message: `High CPU usage detected: ${newCpu.toFixed(1)}%`, timestamp: Date.now(), status: 'active' });
             } else if (newCpu <= 85 && hasCpuAlert) {
-                currentAlerts = currentAlerts.filter(a => a.id !== `${activeNodeId}-cpu`);
+                // Instead of removing, we could mark as resolved, but for this simulation, we'll just let the central manager handle it.
+                // This component's responsibility is just to fire the alert.
             }
             
             if (newMem > 80 && !hasMemAlert) {
                 currentAlerts.push({ id: `${activeNodeId}-mem`, nodeId: activeNodeId, severity: 'warning', message: `High Memory usage detected: ${newMem.toFixed(1)}%`, timestamp: Date.now(), status: 'active' });
             } else if (newMem <= 80 && hasMemAlert) {
-                currentAlerts = currentAlerts.filter(a => a.id !== `${activeNodeId}-mem`);
+                 // Let central manager handle it
             }
             return currentAlerts;
         });
@@ -111,8 +112,8 @@ export const useNodeStatus = () => {
 
   return { 
     status: nodes[activeNodeId], 
-    nodes,
-    alerts: alerts.filter(a => a.nodeId === activeNodeId).sort((a,b) => b.timestamp - a.timestamp),
+    nodes, // Expose all nodes
+    alerts: alerts.sort((a,b) => b.timestamp - a.timestamp), // Return all alerts, not just for active node
     history,
     isLoading: !nodes[activeNodeId], 
     error: null,

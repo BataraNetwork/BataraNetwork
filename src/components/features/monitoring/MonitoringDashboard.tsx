@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, NodeStatus } from '../../../types';
-import { BellIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon } from '../../ui/icons';
+import { BellIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, SparklesIcon } from '../../ui/icons';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
@@ -14,6 +14,8 @@ interface MonitoringDashboardProps {
   availableNodes: { id: string, name: string, region: string }[];
   activeNodeId: string;
   setActiveNodeId: (id: string) => void;
+  analysis: string | null;
+  isAnalyzing: boolean;
 }
 
 const HealthStatusIndicator: React.FC<{ status: NodeStatus['healthStatus'] }> = ({ status }) => {
@@ -34,6 +36,30 @@ const HealthStatusIndicator: React.FC<{ status: NodeStatus['healthStatus'] }> = 
   );
 };
 
+const AnomalyInsightCard: React.FC<{ analysis: string | null, isAnalyzing: boolean }> = ({ analysis, isAnalyzing }) => {
+    return (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+            <div className="flex items-center gap-2 mb-4">
+                <SparklesIcon className="text-sky-400" />
+                <h3 className="text-xl font-bold text-white">AI Anomaly Insights</h3>
+            </div>
+            {isAnalyzing && !analysis && (
+                <div className="text-center text-slate-500 py-4 animate-pulse">
+                    AI is analyzing metric patterns...
+                </div>
+            )}
+            {analysis && (
+                 <div className="text-sm text-slate-300 whitespace-pre-wrap font-sans">{analysis}</div>
+            )}
+             {!isAnalyzing && !analysis && (
+                <div className="text-center text-slate-500 py-4">
+                    No unusual metric patterns detected. System operating within normal parameters.
+                </div>
+             )}
+        </div>
+    );
+};
+
 
 const StatCard: React.FC<{ title: string; value: string | number; unit?: string }> = ({ title, value, unit }) => (
   <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 sm:p-6 transition-transform duration-200 hover:scale-105 hover:bg-slate-700/50">
@@ -52,7 +78,7 @@ const AlertCard: React.FC<{ alert: Alert }> = ({ alert }) => (
     </div>
 );
 
-export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ status, alerts, history, isLoading, error, availableNodes, activeNodeId, setActiveNodeId }) => {
+export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ status, alerts, history, isLoading, error, availableNodes, activeNodeId, setActiveNodeId, analysis, isAnalyzing }) => {
   if (isLoading) {
     return <div className="text-center p-8 text-slate-400">Loading node status...</div>;
   }
@@ -100,15 +126,17 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ status
                 <StatCard title="DB Size" value={status.dbSize} unit="MB" />
                 <StatCard title="Peers" value={status.peers} />
             </div>
+            {/* AI Anomaly Insights */}
+            <AnomalyInsightCard analysis={analysis} isAnalyzing={isAnalyzing} />
             {/* Active Alerts */}
              <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
                 <div className="flex items-center gap-2 mb-4">
                     <BellIcon className="text-yellow-400" />
                     <h3 className="text-xl font-bold text-white">Active Alerts</h3>
                 </div>
-                {alerts.length > 0 ? (
+                {alerts.filter(a => a.status === 'active').length > 0 ? (
                     <div className="space-y-3 max-h-60 overflow-y-auto">
-                        {alerts.map(alert => <AlertCard key={alert.id} alert={alert} />)}
+                        {alerts.filter(a => a.status === 'active').map(alert => <AlertCard key={alert.id} alert={alert} />)}
                     </div>
                 ) : (
                     <p className="text-center text-slate-500 py-4">No active alerts.</p>

@@ -1,4 +1,4 @@
-import { GeneratedFile, SecurityFinding, Alert, LogEntry } from '../types';
+import { GeneratedFile, SecurityFinding, Alert, LogEntry, NodeStatus } from '../types';
 
 export interface GenerateOptions {
   prompt: string;
@@ -95,4 +95,27 @@ export const analyzeLogs = async (logs: LogEntry[]): Promise<string> => {
   
     const data = await response.json();
     return data.analysis;
-  };
+};
+
+/**
+ * Calls the backend API to analyze a time-series of metric data for anomalies.
+ * @param history - An array of historical metric data points.
+ * @returns A promise that resolves to a markdown string containing the anomaly analysis.
+ */
+export const analyzeMetrics = async (history: Omit<NodeStatus, 'id' | 'name' | 'region'>[]): Promise<string> => {
+  const response = await fetch('/api/analyze-metrics', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ history }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+    throw new Error(errorData.error || `Request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.analysis;
+};

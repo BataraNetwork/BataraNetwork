@@ -58,8 +58,15 @@ export class StateManager {
       return false;
     }
 
-    // 2. Balance check (for transfers and fees)
-    const cost = (tx.type === TransactionType.TRANSFER ? tx.amount : 0) + tx.fee;
+    // 2. Balance check (for transfers, stakes, and fees)
+    let amountToDebit = 0;
+    if (tx.type === TransactionType.TRANSFER) {
+      amountToDebit = tx.amount;
+    } else if (tx.type === TransactionType.STAKE) {
+      amountToDebit = tx.amount;
+    }
+    const cost = amountToDebit + tx.fee;
+
     if (sender.balance < cost) {
       console.error(`[State Validation Failed] Insufficient funds for tx ${tx.id}. Sender has ${sender.balance}, needs ${cost}.`);
       return false;

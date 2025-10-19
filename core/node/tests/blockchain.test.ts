@@ -91,6 +91,9 @@ describe('Blockchain', () => {
             totalFees: newBlock.totalFees,
         }));
         
+        // Mock the staking manager to approve the validator
+        jest.spyOn(stakingManager, 'selectNextValidator').mockReturnValue('test-validator');
+        
         const result = await blockchain.addBlock(newBlock);
 
         expect(result).toBe(true);
@@ -150,6 +153,9 @@ describe('Blockchain', () => {
             previousHash: newBlock.previousHash,
             totalFees: newBlock.totalFees,
         }));
+        
+        // Mock the staking manager to approve the validator
+        jest.spyOn(stakingManager, 'selectNextValidator').mockReturnValue('test-validator');
 
         const result = await blockchain.addBlock(newBlock);
         expect(result).toBe(false);
