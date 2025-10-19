@@ -1,5 +1,3 @@
-
-
 import { LevelStorage } from './storage/level';
 import { Block } from './types';
 import { hash, verify } from './utils/crypto';
@@ -109,6 +107,11 @@ export class Blockchain {
     this.latestBlock = block;
     this.mempool.removeTransactions(block.transactions);
     
+    // Log the fee reward for the validator
+    if (block.totalFees > 0) {
+      console.log(`Validator for block #${block.height} earned ${block.totalFees} in transaction fees.`);
+    }
+
     return true;
   }
 }

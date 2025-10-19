@@ -1,100 +1,53 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { GeneratedFile } from "../types";
+// FIX: Implemented the Gemini service to proxy requests to the backend API endpoints.
+// This resolves the "not a module" errors in hooks that import from this file.
 
-// Ensure API_KEY is available from environment variables
-if (!process.env.API_KEY) {
-  // In a real app, you might want to handle this more gracefully,
-  // but for this context, we'll log a warning.
-  console.warn("API_KEY environment variable not set. Gemini API calls will fail.");
+import { GeneratedFile, SecurityFinding } from '../types';
+
+interface GenerateOptions {
+  prompt: string;
+  includeHpa?: boolean;
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
-
 /**
- * Generates DevOps configuration files based on a user prompt.
+ * Calls the backend API to generate DevOps configuration files using AI.
+ * @param options - The generation options including the prompt and other flags.
+ * @returns A promise that resolves to an array of generated files.
  */
-export const generateDevOpsConfig = async (prompt: string): Promise<GeneratedFile[]> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-pro", // Use a powerful model for code generation
-      contents: `
-        Analyze the following request and generate the appropriate DevOps configuration files.
-        The user wants to set up infrastructure for a "Bataranetwork" blockchain node.
-        The available file types are: Dockerfile, docker-compose.yml, .github/workflows/ci.yml, kubernetes.yaml, and helm-chart.zip.
-        Return the response as a JSON array of objects, where each object has a "name" (the filename) and "content" (the file content as a string).
-        Only generate files that are relevant to the user's request.
-        For example, if the user asks for a Docker setup, provide Dockerfile and docker-compose.yml.
-        If they ask for Kubernetes, provide kubernetes.yaml.
+export const generateDevOpsConfig = async (options: GenerateOptions): Promise<GeneratedFile[]> => {
+  const response = await fetch('/api/generate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(options),
+  });
 
-        User Request: "${prompt}"
-      `,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: {
-                type: Type.STRING,
-                description: "The name of the configuration file (e.g., 'Dockerfile', 'kubernetes.yaml')."
-              },
-              content: {
-                type: Type.STRING,
-                description: "The full content of the configuration file."
-              }
-            },
-            required: ["name", "content"]
-          }
-        }
-      }
-    });
-
-    const jsonString = response.text.trim();
-    const generatedFiles = JSON.parse(jsonString) as GeneratedFile[];
-    
-    // Basic validation
-    if (!Array.isArray(generatedFiles) || generatedFiles.some(f => !f.name || !f.content)) {
-        throw new Error("Invalid response format from Gemini API.");
-    }
-
-    return generatedFiles;
-
-  } catch (error) {
-    console.error("Error generating DevOps config:", error);
-    // Provide a user-friendly error message
-    throw new Error("Failed to generate configuration files. Please check your prompt and API key.");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+    throw new Error(errorData.error || `Request failed with status ${response.status}`);
   }
+
+  return response.json();
 };
 
-
 /**
- * Scans source code for security vulnerabilities.
+ * Calls the backend API to analyze a configuration file for security vulnerabilities.
+ * @param content - The string content of the configuration file.
+ * @returns A promise that resolves to an array of security findings.
  */
-export const scanCodeForSecurityIssues = async (code: string, fileName: string): Promise<string> => {
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro", // Good for code analysis
-            contents: `
-                Act as an expert security auditor. Analyze the following source code from the file "${fileName}" for security vulnerabilities.
-                Focus on common issues like injection flaws, improper error handling, secrets exposure, and insecure dependencies.
-                Provide a concise summary of your findings. If no issues are found, state that clearly.
-                Do not suggest fixes, just identify the potential vulnerabilities.
-                
-                Source Code:
-                \`\`\`
-                ${code}
-                \`\`\`
-            `,
-             config: {
-                // Keep temperature low for factual analysis
-                temperature: 0.2,
-            }
-        });
+export const analyzeConfiguration = async (content: string): Promise<SecurityFinding[]> => {
+  const response = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ content }),
+  });
 
-        return response.text;
-    } catch (error) {
-        console.error("Error scanning code for security issues:", error);
-        throw new Error("Failed to scan code. The AI service may be unavailable.");
-    }
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+    throw new Error(errorData.error || `Request failed with status ${response.status}`);
+  }
+
+  return response.json();
 };

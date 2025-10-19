@@ -4,10 +4,16 @@ import { GeneratorForm } from './GeneratorForm';
 import { CodeBlock } from '../../ui/CodeBlock';
 import { useApiKey } from '../../../hooks/useApiKey';
 import { ApiKeyPrompt } from '../../ui/ApiKeyPrompt';
+import { GeneratedFile } from '../../../types';
+import { ShieldCheckIcon } from '../../ui/icons';
 
-export const ConfigGenerator: React.FC = () => {
+interface ConfigGeneratorProps {
+  onScanRequest: (files: GeneratedFile[]) => void;
+}
+
+export const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ onScanRequest }) => {
   const { isApiKeyConfigured } = useApiKey();
-  const { generate, generatedFiles, isLoading, error } = useConfigGenerator();
+  const { generate, generatedFiles, isLoading, error, hasGenerated } = useConfigGenerator();
 
   return (
     <div>
@@ -22,10 +28,22 @@ export const ConfigGenerator: React.FC = () => {
         <>
             <GeneratorForm onGenerate={generate} isLoading={isLoading} />
             
+            {hasGenerated && !isLoading && generatedFiles.length > 0 && (
+              <div className="my-6 flex justify-end">
+                <button
+                  onClick={() => onScanRequest(generatedFiles)}
+                  className="bg-green-600/20 border border-green-500/50 text-green-400 font-semibold rounded-md px-6 py-3 hover:bg-green-500/30 hover:border-green-500/80 transition-colors flex items-center gap-2 shadow-md"
+                >
+                  <ShieldCheckIcon />
+                  Scan Generated Files with AI
+                </button>
+              </div>
+            )}
+            
             {isLoading && (
-            <div className="text-center p-8">
-                <p className="text-lg text-sky-400">Generating files, please wait...</p>
-                <p className="text-slate-500">This may take a moment.</p>
+            <div className="text-center p-8 bg-slate-800/50 border border-slate-700 rounded-lg">
+                <div className="animate-pulse text-lg text-sky-400">Generating files, please wait...</div>
+                <p className="text-slate-500 mt-2">The AI is crafting your configuration. This can sometimes take a few moments.</p>
             </div>
             )}
             

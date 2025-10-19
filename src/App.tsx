@@ -6,11 +6,26 @@ import { MonitoringDashboard } from './components/features/monitoring/Monitoring
 import { PipelineView } from './components/features/pipeline/PipelineView';
 import { SecurityScanner } from './components/features/security/SecurityScanner';
 import { LogViewer } from './components/features/logs/LogViewer';
+import { GeneratedFile } from './types';
 
-const TABS = ['Generator', 'Monitoring', 'CI/CD Pipeline', 'Security', 'Logs'];
+const TABS = ['Generator', 'Monitoring', 'CI/CD Pipeline', 'Security Scanner', 'Logs'];
 
 function App() {
   const [activeTab, setActiveTab] = useState(TABS[0]);
+  // State to manage the content passed from Generator to Scanner
+  const [scanRequestContent, setScanRequestContent] = useState<string | null>(null);
+
+
+  const handleScanRequest = (files: GeneratedFile[]) => {
+    // Combine all generated files into a single string for the scanner
+    const combinedContent = files
+        .map(file => `--- # FILENAME: ${file.name}\n\n${file.content}`)
+        .join('\n\n');
+    
+    setScanRequestContent(combinedContent);
+    setActiveTab('Security Scanner');
+  };
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -18,13 +33,16 @@ function App() {
         return <MonitoringDashboard />;
       case 'CI/CD Pipeline':
         return <PipelineView />;
-      case 'Security':
-        return <SecurityScanner />;
+      case 'Security Scanner':
+        return <SecurityScanner 
+                    initialContent={scanRequestContent} 
+                    onScanComplete={() => setScanRequestContent(null)} 
+                />;
       case 'Logs':
           return <LogViewer />;
       case 'Generator':
       default:
-        return <ConfigGenerator />;
+        return <ConfigGenerator onScanRequest={handleScanRequest} />;
     }
   };
 

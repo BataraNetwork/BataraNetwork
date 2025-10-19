@@ -1,41 +1,97 @@
 import { useState, useEffect } from 'react';
-import { NodeStatus } from '../types';
+import { NodeStatus, Alert } from '../types';
 
-// Mock data for demonstration purposes
-const initialStatus: NodeStatus = {
-  latestBlockHeight: 1024,
-  pendingTransactions: 5,
-  peers: 8,
-  version: 'v0.2.1',
-  uptime: 3600 * 24 * 2, // 2 days in seconds
-};
+// Mock data for multiple nodes
+const initialNodesData: Omit<NodeStatus, 'latestBlockHeight' | 'pendingTransactions' | 'uptime' | 'cpuUsage' | 'memoryUsage' | 'networkIo' | 'dbSize'>[] = [
+  { id: 'node-us-east-1', name: 'Primary Node', region: 'us-east-1', peers: 8 },
+  { id: 'node-eu-west-1', name: 'Failover Node', region: 'eu-west-1', peers: 12 },
+  { id: 'node-ap-south-1', name: 'Staging Node', region: 'ap-south-1', peers: 4 },
+];
+
+const generateInitialState = (): Record<string, NodeStatus> => {
+    const map: Record<string, NodeStatus> = {};
+    initialNodesData.forEach(node => {
+        map[node.id] = {
+            ...node,
+            latestBlockHeight: Math.floor(Math.random() * 500) + 1000,
+            pendingTransactions: Math.floor(Math.random() * 20),
+            uptime: Math.floor(Math.random() * 3600 * 24 * 7),
+            cpuUsage: Math.floor(Math.random() * 30) + 10,
+            memoryUsage: Math.floor(Math.random() * 40) + 20,
+            networkIo: { ingress: 0, egress: 0 },
+            dbSize: Math.floor(Math.random() * 1000) + 200,
+        };
+    });
+    return map;
+}
 
 export const useNodeStatus = () => {
-  const [status, setStatus] = useState<NodeStatus>(initialStatus);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [nodes, setNodes] = useState<Record<string, NodeStatus>>(generateInitialState);
+  const [activeNodeId, setActiveNodeId] = useState<string>(initialNodesData[0].id);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
-    // Simulate initial fetch
-    const timer = setTimeout(() => {
-        setIsLoading(false);
-    }, 500);
-
-    // Simulate real-time updates
     const interval = setInterval(() => {
-      setStatus(prevStatus => ({
-        ...prevStatus,
-        latestBlockHeight: prevStatus.latestBlockHeight + 1,
-        pendingTransactions: Math.max(0, Math.floor(Math.random() * 10 - 2) + prevStatus.pendingTransactions),
-        uptime: prevStatus.uptime + 5
-      }));
-    }, 5000); // Update every 5 seconds
+      setNodes(prevNodes => {
+        const activeNode = prevNodes[activeNodeId];
+        if (!activeNode) return prevNodes;
 
-    return () => {
-        clearTimeout(timer);
-        clearInterval(interval);
-    };
-  }, []);
+        // Simulate metric fluctuations
+        const cpuF = Math.random() > 0.5 ? 1 : -1;
+        const memF = Math.random() > 0.5 ? 1 : -1;
+        const newCpu = Math.min(100, Math.max(5, activeNode.cpuUsage + cpuF * (Math.random() * 5)));
+        const newMem = Math.min(100, Math.max(10, activeNode.memoryUsage + memF * (Math.random() * 3)));
+        
+        // Check for new alerts
+        if (newCpu > 85 && !alerts.some(a => a.id === `${activeNodeId}-cpu`)) {
+            setAlerts(prev => [...prev, { id: `${activeNodeId}-cpu`, nodeId: activeNodeId, severity: 'critical', message: `High CPU usage detected: ${newCpu.toFixed(1)}%`, timestamp: Date.now() }]);
+        } else if (newCpu <= 85 && alerts.some(a => a.id === `${activeNodeId}-cpu`)) {
+            setAlerts(prev => prev.filter(a => a.id !== `${activeNodeId}-cpu`));
+        }
+        
+        if (newMem > 80 && !alerts.some(a => a.id === `${activeNodeId}-mem`)) {
+            setAlerts(prev => [...prev, { id: `${activeNodeId}-mem`, nodeId: activeNodeId, severity: 'warning', message: `High Memory usage detected: ${newMem.toFixed(1)}%`, timestamp: Date.now() }]);
+        } else if (newMem <= 80 && alerts.some(a => a.id === `${activeNodeId}-mem`)) {
+             setAlerts(prev => prev.filter(a => a.id !== `${activeNodeId}-mem`));
+        }
 
-  return { status, isLoading, error };
+        const updatedNode = {
+            ...activeNode,
+            latestBlockHeight: activeNode.latestBlockHeight + 1,
+            pendingTransactions: Math.max(0, Math.floor(Math.random() * 10 - 4) + activeNode.pendingTransactions),
+            uptime: activeNode.uptime + 2,
+            cpuUsage: parseFloat(newCpu.toFixed(1)),
+            memoryUsage: parseFloat(newMem.toFixed(1)),
+            networkIo: {
+                ingress: Math.floor(Math.random() * 500 + 100),
+                egress: Math.floor(Math.random() * 200 + 50)
+            },
+            dbSize: parseFloat((activeNode.dbSize + 0.01).toFixed(2)),
+        };
+
+        setHistory(prev => [...prev.slice(-29), {
+            time: new Date().toLocaleTimeString(),
+            cpuUsage: updatedNode.cpuUsage,
+            memoryUsage: updatedNode.memoryUsage,
+            networkIo: updatedNode.networkIo,
+        }]);
+
+        return { ...prevNodes, [activeNodeId]: updatedNode };
+      });
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [activeNodeId, alerts]);
+
+  return { 
+    status: nodes[activeNodeId], 
+    alerts: alerts.filter(a => a.nodeId === activeNodeId).sort((a,b) => b.timestamp - a.timestamp),
+    history,
+    isLoading: !nodes[activeNodeId], 
+    error: null,
+    availableNodes: initialNodesData,
+    activeNodeId,
+    setActiveNodeId,
+  };
 };
