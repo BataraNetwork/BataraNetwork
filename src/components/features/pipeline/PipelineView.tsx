@@ -1,7 +1,16 @@
 import React from 'react';
 import { usePipeline } from '../../../hooks/usePipeline';
 import { PipelineRun, PipelineStage, PipelineStatus } from '../../../types';
-import { HistoryIcon } from '../../ui/icons';
+import { 
+    HistoryIcon, 
+    GitBranchIcon, 
+    PackageIcon, 
+    BeakerIcon, 
+    LayersIcon, 
+    UploadCloudIcon, 
+    UserCheckIcon, 
+    RocketIcon 
+} from '../../ui/icons';
 
 const getStatusStyles = (status: PipelineStatus) => {
     switch (status) {
@@ -18,6 +27,17 @@ const getStatusStyles = (status: PipelineStatus) => {
             return { icon: '', color: 'text-slate-500', bg: 'bg-slate-600' };
     }
 }
+
+const STAGE_ICONS: Record<string, React.FC<{className?: string}>> = {
+    'Checkout': GitBranchIcon,
+    'Install Dependencies': PackageIcon,
+    'Lint & Test': BeakerIcon,
+    'Build Image': LayersIcon,
+    'Push to Registry': UploadCloudIcon,
+    'Manual Approval (Staging)': UserCheckIcon,
+    'Deploy to Production': RocketIcon,
+};
+
 
 const StageCard: React.FC<{ stage: PipelineStage; onApprove?: () => void; onReject?: () => void; }> = ({ stage, onApprove, onReject }) => {
     const { color } = getStatusStyles(stage.status);
@@ -95,18 +115,19 @@ export const PipelineView: React.FC = () => {
                         {/* Vertical Timeline */}
                         <div className="flex flex-col">
                             {currentRun.stages.map((stage, index) => {
-                                const { bg } = getStatusStyles(stage.status);
+                                const { bg, color } = getStatusStyles(stage.status);
                                 const isLastStage = index === currentRun.stages.length - 1;
+                                const IconComponent = STAGE_ICONS[stage.name] || LayersIcon;
 
                                 return (
                                     <div key={stage.name} className="flex items-start">
                                         <div className="flex flex-col items-center mr-4 sm:mr-6">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg z-10 ${bg}`}>
-                                                {getStatusStyles(stage.status).icon || index + 1}
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white z-10 ${bg}`}>
+                                                <IconComponent className={`h-6 w-6 ${stage.status === 'pending' ? 'text-slate-400' : 'text-white'}`} />
                                             </div>
                                             {!isLastStage && <div className="w-px h-24 bg-slate-600"></div>}
                                         </div>
-                                        <div className={`pt-1 w-full ${!isLastStage ? 'pb-10' : ''}`}>
+                                        <div className={`pt-2 w-full ${!isLastStage ? 'pb-12' : ''}`}>
                                             <StageCard stage={stage} onApprove={approveStage} onReject={rejectStage} />
                                         </div>
                                     </div>

@@ -11,10 +11,10 @@ export default async function handler(
     return response.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { prompt, includeHpa } = request.body;
+  const { prompt, configType, includeHpa } = request.body;
 
-  if (!prompt) {
-    return response.status(400).json({ error: 'Prompt is required' });
+  if (!configType) {
+    return response.status(400).json({ error: 'configType is required' });
   }
   
   const apiKey = process.env.API_KEY;
@@ -29,21 +29,21 @@ export default async function handler(
       ? "If generating a Kubernetes or Helm configuration, also include a HorizontalPodAutoscaler (HPA) manifest targeting 80% CPU utilization."
       : "";
 
+    const systemPrompt = `
+      You are an expert DevOps engineer. Your task is to generate a professional, production-ready configuration file based on the user's request.
+      The context is a blockchain node called "Bataranetwork".
+      The user has requested a "${configType}" file.
+      Adhere to the user's specific instructions. If no instructions are provided, generate a sensible default for the Bataranetwork node.
+      For Helm Charts, return multiple files separated by '---' and prefixed with '# FILENAME: ' (e.g., '# FILENAME: Chart.yaml').
+      For all other types, return only the raw file content without any extra explanation or markdown code fences.
+      ${hpaInstruction}
+    `;
+    
+    const userPrompt = `User instructions: "${prompt || 'Generate a default configuration.'}"`;
+
     const geminiResponse = await ai.models.generateContent({
       model: "gemini-2.5-pro",
-      contents: `
-        Analyze the following request and generate the appropriate DevOps configuration files.
-        The user wants to set up infrastructure for a "Bataranetwork" blockchain node.
-        The available file types are: Dockerfile, docker-compose.yml, .github/workflows/ci.yml, kubernetes.yaml, and a multi-file Helm Chart.
-        For Helm Charts, return multiple files prefixed with 'FILENAME: ' (e.g., 'FILENAME: Chart.yaml', 'FILENAME: values.yaml').
-        Return the response as a single string.
-        Only generate files that are relevant to the user's request.
-        For example, if the user asks for a Docker setup, provide Dockerfile and docker-compose.yml.
-        If they ask for Kubernetes, provide kubernetes.yaml.
-        ${hpaInstruction}
-
-        User Request: "${prompt}"
-      `,
+      contents: `${systemPrompt}\n\n${userPrompt}`,
        config: {
         temperature: 0.1,
       }
@@ -52,7 +52,7 @@ export default async function handler(
     const rawContent = geminiResponse.text.trim();
     
     let files;
-    if (rawContent.includes('FILENAME:')) {
+    if (configType === 'Helm Chart') {
         files = rawContent.split('---').map(part => {
             const match = part.match(/# FILENAME: (.*?)\n/);
             if (match) {
@@ -64,10 +64,23 @@ export default async function handler(
         }).filter((file): file is { name: string; content: string } => file !== null && file.name.length > 0 && file.content.length > 0);
     } else {
       let fileName = 'config.txt';
-      if (prompt.toLowerCase().includes('dockerfile')) fileName = 'Dockerfile';
-      else if (prompt.toLowerCase().includes('kubernetes')) fileName = 'kubernetes.yaml';
-      else if (prompt.toLowerCase().includes('docker-compose')) fileName = 'docker-compose.yml';
-      else if (prompt.toLowerCase().includes('github')) fileName = '.github/workflows/ci.yml';
+      switch (configType) {
+        case 'Dockerfile':
+          fileName = 'Dockerfile';
+          break;
+        case 'Docker Compose':
+          fileName = 'docker-compose.yml';
+          break;
+        case 'GitHub Actions':
+          fileName = '.github/workflows/ci.yml';
+          break;
+        case 'Kubernetes':
+          fileName = 'kubernetes.yaml';
+          break;
+        case 'Prometheus':
+          fileName = 'prometheus.yml';
+          break;
+      }
       files = [{ name: fileName, content: rawContent }];
     }
 

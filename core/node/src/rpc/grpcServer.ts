@@ -85,8 +85,10 @@ export class GrpcServer {
 
     private broadcastTransaction(call: any, callback: any): void {
         const transaction: Transaction = call.request.transaction;
-        // Basic validation
-        if (!transaction || !transaction.id || !transaction.from || !transaction.to || transaction.amount === undefined) {
+        // Basic validation for common transaction properties
+        // The mempool will perform more thorough, type-specific validation.
+        // FIX: Added nonce check.
+        if (!transaction || !transaction.id || !transaction.from || !transaction.signature || !transaction.type || typeof transaction.nonce !== 'number') {
             return callback({
                 code: grpc.status.INVALID_ARGUMENT,
                 details: 'Invalid transaction format',

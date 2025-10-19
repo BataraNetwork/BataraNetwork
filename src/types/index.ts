@@ -18,6 +18,7 @@ export interface NodeStatus {
   };
   dbSize: number; // MB
   uptime: number; // in seconds
+  healthStatus: 'ok' | 'degraded' | 'unreachable';
 }
 
 export type PipelineStatus = 'pending' | 'running' | 'success' | 'failed' | 'approval';
@@ -65,4 +66,5 @@ export interface Alert {
     severity: 'critical' | 'warning';
     message: string;
     timestamp: number;
+    status: 'active' | 'acknowledged';
 }

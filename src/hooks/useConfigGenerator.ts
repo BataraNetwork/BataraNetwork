@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GeneratedFile } from '../types';
-import { generateDevOpsConfig } from '../services/geminiService';
+import { generateDevOpsConfig, GenerateOptions } from '../services/geminiService';
 
 export const useConfigGenerator = () => {
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
@@ -8,7 +8,7 @@ export const useConfigGenerator = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
-  const generate = async (options: { prompt: string; includeHpa?: boolean }) => {
+  const generate = async (options: GenerateOptions) => {
     setIsLoading(true);
     setError(null);
     setGeneratedFiles([]); // Clear previous results

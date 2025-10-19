@@ -2,10 +2,16 @@
 import { describe, beforeEach, afterEach, it, expect, jest } from '@jest/globals';
 import { Blockchain } from '../src/blockchain';
 import { LevelStorage } from '../src/storage/level';
-import { Block, Transaction } from '../src/types';
+// FIX: Import TransactionType to be used in test data.
+import { Account, Block, Transaction, TransactionType, TransferTransaction } from '../src/types';
 import * as crypto from '../src/utils/crypto';
 import * as fs from 'fs';
 import { Mempool } from '../src/mempool';
+// FIX: Import required dependencies for the Blockchain constructor.
+import { StakingManager } from '../src/staking/stakingManager';
+import { WasmEngine } from '../src/vm/wasmEngine';
+import { GovernanceModule } from '../src/governance/governanceModule';
+import { StateManager } from '../src/state/stateManager';
 
 const TEST_DB_PATH = './test-db';
 
@@ -14,6 +20,10 @@ describe('Blockchain', () => {
     let mempool: Mempool;
     let blockchain: Blockchain;
     let verifyMock: jest.SpyInstance;
+    let stakingManager: StakingManager;
+    let wasmEngine: WasmEngine;
+    let governanceModule: GovernanceModule;
+    let stateManager: StateManager;
 
     beforeEach(async () => {
         // Clean up database before each test
@@ -23,7 +33,13 @@ describe('Blockchain', () => {
         storage = new LevelStorage(TEST_DB_PATH);
         await storage.open();
         mempool = new Mempool();
-        blockchain = new Blockchain(storage, mempool);
+        stakingManager = new StakingManager([]);
+        wasmEngine = new WasmEngine();
+        governanceModule = new GovernanceModule();
+        // Instantiate the new StateManager
+        stateManager = new StateManager(storage);
+
+        blockchain = new Blockchain(storage, mempool, stakingManager, wasmEngine, governanceModule, stateManager);
         await blockchain.initialize();
 
         // Mock crypto.verify to always return true for these tests, as we are not testing cryptography itself.
@@ -46,8 +62,14 @@ describe('Blockchain', () => {
         expect(latestBlock.totalFees).toBe(0);
     });
 
-    it('should add a valid block with transactions and remove them from the mempool', async () => {
-        const tx1: Transaction = { id: 'tx1', from: 'a', to: 'b', amount: 10, fee: 1, signature: 'sig1' };
+    it('should add a valid block with transactions and update state', async () => {
+        // Setup initial state for the sender
+        const senderAddress = 'sender-address';
+        const receiverAddress = 'receiver-address';
+        const initialSenderAccount: Account = { address: senderAddress, balance: 100, nonce: 0 };
+        await storage.saveAccount(initialSenderAccount);
+
+        const tx1: TransferTransaction = { type: TransactionType.TRANSFER, id: 'tx1', from: senderAddress, to: receiverAddress, amount: 10, fee: 1, nonce: 0, signature: 'sig1' };
         mempool.addTransaction(tx1);
         
         const latestBlock = blockchain.getLatestBlock();
@@ -59,7 +81,7 @@ describe('Blockchain', () => {
             validator: 'test-validator',
             signature: 'test-signature',
             hash: '',
-            totalFees: 1, // Correct fee sum
+            totalFees: 1,
         };
         newBlock.hash = crypto.hash(JSON.stringify({
             height: newBlock.height,
@@ -75,8 +97,14 @@ describe('Blockchain', () => {
         const updatedLatestBlock = blockchain.getLatestBlock();
         expect(updatedLatestBlock.height).toBe(1);
         expect(updatedLatestBlock.hash).toBe(newBlock.hash);
-        expect(updatedLatestBlock.totalFees).toBe(1);
-        expect(mempool.getPendingTransactions().length).toBe(0); // Should be removed from mempool
+        expect(mempool.getPendingTransactions().length).toBe(0);
+
+        // Verify state changes
+        const finalSenderAccount = await stateManager.getAccount(senderAddress);
+        const finalReceiverAccount = await stateManager.getAccount(receiverAddress);
+        expect(finalSenderAccount.balance).toBe(89); // 100 - 10 (amount) - 1 (fee)
+        expect(finalSenderAccount.nonce).toBe(1);
+        expect(finalReceiverAccount.balance).toBe(10);
     });
     
     it('should reject a block with invalid height', async () => {
@@ -96,30 +124,40 @@ describe('Blockchain', () => {
         expect(blockchain.getLatestBlock().height).toBe(0);
     });
 
-    it('should reject a block with an incorrect hash due to wrong totalFees', async () => {
-        const tx1: Transaction = { id: 'tx1', from: 'a', to: 'b', amount: 10, fee: 1, signature: 'sig1' };
+    it('should reject a block with an invalid transaction (e.g., wrong nonce)', async () => {
+        const senderAddress = 'sender-address';
+        const initialSenderAccount: Account = { address: senderAddress, balance: 100, nonce: 0 };
+        await storage.saveAccount(initialSenderAccount);
+
+        // Transaction with wrong nonce (should be 0)
+        const invalidTx: TransferTransaction = { type: TransactionType.TRANSFER, id: 'tx1', from: senderAddress, to: 'receiver', amount: 10, fee: 1, nonce: 1, signature: 'sig1' };
+
         const latestBlock = blockchain.getLatestBlock();
-        
-        // This block is invalid because its hash is calculated with the wrong totalFees
-        const blockWithBadHash: Block = {
+        const newBlock: Block = {
             height: 1,
             timestamp: Date.now(),
-            transactions: [tx1],
+            transactions: [invalidTx],
             previousHash: latestBlock.hash,
             validator: 'test-validator',
             signature: 'test-signature',
+            hash: '',
             totalFees: 1,
-            hash: crypto.hash(JSON.stringify({
-                height: 1,
-                timestamp: Date.now(),
-                transactions: [tx1],
-                previousHash: latestBlock.hash,
-                totalFees: 999, // Mismatched fee used for hashing
-            })),
         };
+        newBlock.hash = crypto.hash(JSON.stringify({
+            height: newBlock.height,
+            timestamp: newBlock.timestamp,
+            transactions: newBlock.transactions,
+            previousHash: newBlock.previousHash,
+            totalFees: newBlock.totalFees,
+        }));
 
-        const result = await blockchain.addBlock(blockWithBadHash);
+        const result = await blockchain.addBlock(newBlock);
         expect(result).toBe(false);
         expect(blockchain.getLatestBlock().height).toBe(0);
+
+        // Verify state was not changed
+        const finalSenderAccount = await stateManager.getAccount(senderAddress);
+        expect(finalSenderAccount.balance).toBe(100);
+        expect(finalSenderAccount.nonce).toBe(0);
     });
 });

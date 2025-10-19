@@ -19,7 +19,7 @@ export const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ onScanRequest 
     <div>
       <h2 className="text-3xl font-bold text-white mb-2">AI-Powered DevOps Generator</h2>
       <p className="text-slate-400 mb-6">
-        Describe your infrastructure needs, and our AI assistant will generate the necessary configuration files for your Bataranetwork node.
+        Select a configuration type, provide any specific instructions, and our AI assistant will generate the necessary files for your Bataranetwork node.
       </p>
 
       {!isApiKeyConfigured ? (

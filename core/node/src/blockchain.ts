@@ -1,17 +1,25 @@
+// core/node/src/blockchain.ts
+
 import { LevelStorage } from './storage/level';
-import { Block } from './types';
+import { Block, Transaction, TransactionType } from './types';
 import { hash, verify } from './utils/crypto';
 import { Mempool } from './mempool';
+import { StakingManager } from './staking/stakingManager';
+import { WasmEngine } from './vm/wasmEngine';
+import { GovernanceModule } from './governance/governanceModule';
+import { StateManager } from './state/stateManager';
 
 export class Blockchain {
-  private storage: LevelStorage;
-  private mempool: Mempool;
   private latestBlock!: Block; // Initialized in initialize()
 
-  constructor(storage: LevelStorage, mempool: Mempool) {
-    this.storage = storage;
-    this.mempool = mempool;
-  }
+  constructor(
+    private storage: LevelStorage, 
+    private mempool: Mempool,
+    private stakingManager: StakingManager,
+    private wasmEngine: WasmEngine,
+    private governanceModule: GovernanceModule,
+    private stateManager: StateManager,
+  ) {}
 
   public async initialize(): Promise<void> {
     const latest = await this.storage.getLatestBlock();
@@ -31,7 +39,7 @@ export class Blockchain {
       timestamp: Date.now(),
       transactions: [],
       previousHash: '0'.repeat(64),
-      validator: 'genesis-validator',
+      validator: 'genesis-validator-PoS', // Updated for PoS
       totalFees: 0,
     };
 
@@ -46,8 +54,56 @@ export class Blockchain {
     return {
       ...genesisData,
       hash: blockHash,
-      signature: 'genesis-signature',
+      signature: 'genesis-signature-PoS',
     };
+  }
+  
+  /**
+   * Processes a single transaction, updating the appropriate state machine (staking, governance, VM, state).
+   * @param transaction The transaction to process.
+   * @returns A boolean indicating if the transaction was processed successfully.
+   */
+  private async processTransaction(transaction: Transaction): Promise<boolean> {
+    // Basic signature verification can be done here, but StateManager handles core state logic.
+    // const isValidSignature = verify(transaction.id, transaction.from, transaction.signature);
+    // if (!isValidSignature) return false;
+
+    // Apply core state changes (balance, nonce)
+    const stateApplied = await this.stateManager.applyTransaction(transaction);
+    if (!stateApplied) {
+      return false; // Stop if nonce or balance check fails
+    }
+
+    // Apply logic specific to other modules
+    switch (transaction.type) {
+      case TransactionType.TRANSFER:
+        // StateManager already handled the balance transfer.
+        return true;
+
+      case TransactionType.CONTRACT_CREATION:
+        this.wasmEngine.deployContract(transaction);
+        return true;
+        
+      case TransactionType.CONTRACT_CALL:
+        this.wasmEngine.executeContract(transaction);
+        return true;
+        
+      case TransactionType.STAKE:
+        this.stakingManager.processStake(transaction);
+        return true;
+
+      case TransactionType.GOVERNANCE_PROPOSAL:
+        this.governanceModule.submitProposal(transaction, this.latestBlock.height);
+        return true;
+
+      case TransactionType.GOVERNANCE_VOTE:
+        this.governanceModule.castVote(transaction);
+        return true;
+
+      default:
+        console.warn(`Unknown transaction type: ${(transaction as any).type}`);
+        return false;
+    }
   }
 
   public getLatestBlock(): Block {
@@ -70,6 +126,13 @@ export class Blockchain {
         }
     }
     return blocks;
+  }
+  
+  /**
+   * Returns the public key of the validator expected to produce the next block.
+   */
+  public getCurrentValidator(): string | null {
+    return this.stakingManager.selectNextValidator(this.latestBlock.height);
   }
 
   public async addBlock(block: Block): Promise<boolean> {
@@ -101,13 +164,34 @@ export class Blockchain {
         console.error(`[Validation Failed] Invalid signature for block #${block.height}. The validator's signature is not correct.`);
         return false;
     }
+    
+    // 4. PoS Validator verification (consensus)
+    const expectedValidator = this.stakingManager.selectNextValidator(this.latestBlock.height);
+    if (block.validator !== expectedValidator) {
+        console.error(`[Validation Failed] Invalid validator for block #${block.height}. Expected ${expectedValidator ? expectedValidator.substring(0,15) : 'N/A'}..., got ${block.validator.substring(0,15)}...`);
+        return false;
+    }
+    
+    // 5. Process all transactions in the block
+    // TODO: In a real implementation, we would create a temporary state snapshot here,
+    // apply transactions to it, and only commit to the main state if all succeed.
+    for (const tx of block.transactions) {
+        const success = await this.processTransaction(tx);
+        if (!success) {
+            console.error(`[Validation Failed] Block #${block.height} contains an invalid transaction: ${tx.id}`);
+            // In a real system, we might have more complex rollback logic here.
+            return false;
+        }
+    }
+    
+    // 6. Tally votes for any ended governance proposals
+    this.governanceModule.tallyVotes(block.height);
 
-    // If all checks pass, add the block
+    // If all checks pass, commit the block
     await this.storage.saveBlock(block);
     this.latestBlock = block;
     this.mempool.removeTransactions(block.transactions);
     
-    // Log the fee reward for the validator
     if (block.totalFees > 0) {
       console.log(`Validator for block #${block.height} earned ${block.totalFees} in transaction fees.`);
     }

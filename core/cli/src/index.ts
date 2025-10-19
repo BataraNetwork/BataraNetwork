@@ -1,17 +1,15 @@
+// core/cli/src/index.ts
+
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
-import { BataraClient } from '../../../sdk/js/src/index';
-// The SDK also exports the Transaction interface. We use a type-only import
-// as we only need it for type definitions.
-import type { Transaction } from '../../../sdk/js/src/index';
+// FIX: Changed to a standard import to use TransactionType enum as a value, and used `type` keyword for type-only imports.
+import { BataraClient, TransactionType, type Transaction, type TransferTransaction, type StakeTransaction, type ContractCreationTransaction, type GovernanceProposalTransaction, type GovernanceVoteTransaction } from '../../../sdk/js/src/index';
 import * as crypto from './crypto';
-// FIX: Import 'process' to provide types for 'process.argv'.
 import process from 'process';
 
 const program = new Command();
-// Allow configuring the node URL via an environment variable.
 const client = new BataraClient(process.env.NODE_API_URL || 'http://localhost:3000');
 
 program
@@ -19,7 +17,34 @@ program
   .description('CLI for interacting with the Bataranetwork blockchain')
   .version('0.1.0');
 
-// Command: generate-wallet
+// Helper to create and sign a transaction
+const createSignedTransaction = (walletPath: string, txData: { type: TransactionType; fee: number; nonce: number } & { [key: string]: any }): Transaction => {
+    const resolvedPath = path.resolve(walletPath);
+    if (!fs.existsSync(resolvedPath)) {
+        throw new Error(`Wallet file not found at ${resolvedPath}`);
+    }
+    const wallet = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
+    const { privateKey, publicKey: fromAddress } = wallet;
+
+    if (!privateKey || !crypto.isValidPrivateKey(privateKey)) {
+        throw new Error('Wallet file contains an invalid or missing private key.');
+    }
+    
+    // Nonce is now part of the signed payload
+    const txToHash = { ...txData, from: fromAddress, timestamp: Date.now() };
+    const txId = crypto.hash(txToHash);
+    const signature = crypto.sign(txId, privateKey);
+
+    return {
+        ...txData,
+        id: txId,
+        from: fromAddress,
+        signature,
+    } as Transaction;
+};
+
+
+// --- Wallet Commands ---
 program
   .command('generate-wallet')
   .description('Generate a new wallet (key pair) and save it to a file')
@@ -27,21 +52,17 @@ program
   .action((options) => {
     try {
       const { publicKey, privateKey } = crypto.generateKeys();
-      const wallet = {
-        publicKey,
-        privateKey,
-      };
+      const wallet = { publicKey, privateKey };
       const outputPath = path.resolve(options.output);
       fs.writeFileSync(outputPath, JSON.stringify(wallet, null, 2));
       console.log(`Wallet generated and saved to ${outputPath}`);
-      console.log('\nPublic Key (PEM):');
-      console.log(publicKey);
+      console.log(`\nPublic Key (Address):\n${publicKey}`);
     } catch (error: any) {
       console.error('Failed to generate wallet:', error.message);
     }
   });
 
-// Command: get-status
+// --- Node Info Commands ---
 program
   .command('get-status')
   .description('Get the current status of the blockchain node')
@@ -54,16 +75,12 @@ program
     }
   });
 
-// Command: get-block
 program
   .command('get-block <height>')
   .description('Get a block by its height')
   .action(async (heightStr) => {
     const height = parseInt(heightStr, 10);
-    if (isNaN(height)) {
-      console.error('Error: Block height must be a number.');
-      return;
-    }
+    if (isNaN(height)) return console.error('Error: Block height must be a number.');
     try {
       const block = await client.getBlock(height);
       console.log(`Block #${height}:`, JSON.stringify(block, null, 2));
@@ -72,107 +89,172 @@ program
     }
   });
 
-// Command: send-transaction
 program
-  .command('send-transaction')
-  .description('Create and broadcast a new transaction')
-  .option('-w, --wallet <path>', 'Path to the sender wallet file')
+    .command('get-balance <address>')
+    .description("Get an account's balance and nonce")
+    .action(async (address) => {
+        try {
+            const account = await client.getAccount(address);
+            console.log(`Account details for ${address}:`, JSON.stringify(account, null, 2));
+        } catch (error: any) {
+            console.error(`Error getting balance:`, error.message);
+        }
+    });
+
+// --- Transaction Commands ---
+program
+  .command('send-transfer')
+  .description('Create and broadcast a transfer transaction')
+  .requiredOption('-w, --wallet <path>', 'Path to the sender wallet file')
   .requiredOption('-t, --to <address>', "Recipient's public key (PEM format)")
   .requiredOption('-a, --amount <number>', 'Amount to send')
+  .requiredOption('-n, --nonce <number>', 'The next nonce for the sender account')
   .option('-f, --fee <number>', 'Transaction fee', '0')
   .action(async (options) => {
     try {
-      let walletPath = options.wallet;
-
-      // If the wallet path is not provided via flags, prompt the user for it.
-      // This improves security by preventing the key path from being saved in shell history.
-      if (!walletPath) {
-        const rl = readline.createInterface({
-          input: process.stdin,
-          output: process.stdout
-        });
-        const question = (query: string): Promise<string> => new Promise(resolve => rl.question(query, resolve));
-        walletPath = await question('Enter the path to your wallet file: ');
-        rl.close();
-      }
-
-      if (!walletPath) {
-        console.error('Error: Wallet file path is required.');
-        return;
-      }
-
-      const resolvedPath = path.resolve(walletPath);
-
-      // Validate that the file exists and is readable before proceeding.
-      try {
-        fs.accessSync(resolvedPath, fs.constants.R_OK);
-      } catch (err) {
-        console.error(`Error: Cannot read wallet file at ${resolvedPath}. Please check the path and permissions.`);
-        return;
-      }
-
-      const wallet = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
-      const { privateKey, publicKey: fromAddress } = wallet;
-
-      // Validate the private key to ensure it's in the correct PEM format.
-      if (!privateKey || !crypto.isValidPrivateKey(privateKey)) {
-        console.error('Error: Wallet file contains an invalid or missing PEM-encoded private key.');
-        return;
-      }
-      
-      if (!fromAddress) {
-        console.error('Error: Invalid wallet file format. Must contain publicKey.');
-        return;
-      }
-
-      const amount = parseFloat(options.amount);
-      const fee = parseFloat(options.fee);
-
-      if (isNaN(amount) || amount <= 0) {
-        console.error('Error: Amount must be a positive number.');
-        return;
-      }
-      if (isNaN(fee) || fee < 0) {
-        console.error('Error: Fee must be a non-negative number.');
-        return;
-      }
-
-      // To create a deterministic ID, we hash the core transaction data.
-      // A timestamp is included to ensure uniqueness for identical transactions.
-      const txDataToHash = {
-        from: fromAddress,
+      const transaction = createSignedTransaction(options.wallet, {
+        type: TransactionType.TRANSFER,
         to: options.to,
-        amount,
-        fee,
-        timestamp: Date.now(),
-      };
-
-      const txId = crypto.hash(txDataToHash);
-      const signature = crypto.sign(txId, privateKey);
-      
-      const transaction: Transaction = {
-        id: txId,
-        from: fromAddress,
-        to: options.to,
-        amount,
-        fee,
-        signature,
-      };
-
-      console.log('Broadcasting transaction:', JSON.stringify(transaction, null, 2));
-      const result = await client.broadcastTransaction(transaction);
-      console.log('Transaction broadcast result:', result);
-
+        amount: parseFloat(options.amount),
+        nonce: parseInt(options.nonce, 10),
+        fee: parseFloat(options.fee),
+      });
+      console.log('Broadcasting transfer:', JSON.stringify(transaction, null, 2));
+      const result = await client.transferTokens(transaction as TransferTransaction);
+      console.log('Broadcast result:', result);
     } catch (error: any) {
-      // Provide more specific feedback for network errors.
-      if (error.response) {
-        console.error(`Error sending transaction (server response ${error.response.status}):`, error.response.data);
-      } else if (error.request) {
-        console.error('Error sending transaction: No response from server. Is the node running at the configured URL?');
-      } else {
-        console.error('Error sending transaction:', error.message);
-      }
+      console.error('Error sending transaction:', error.message);
     }
   });
+
+// --- Staking Commands ---
+program
+  .command('stake-tokens')
+  .description('Stake tokens for a validator')
+  .requiredOption('-w, --wallet <path>', 'Path to the staker wallet file')
+  .requiredOption('-v, --validator <address>', 'The public key of the validator to stake for')
+  .requiredOption('-a, --amount <number>', 'Amount to stake')
+  .requiredOption('-n, --nonce <number>', 'The next nonce for the sender account')
+  .option('-f, --fee <number>', 'Transaction fee', '0')
+  .action(async (options) => {
+    try {
+        const transaction = createSignedTransaction(options.wallet, {
+            type: TransactionType.STAKE,
+            validator: options.validator,
+            amount: parseFloat(options.amount),
+            nonce: parseInt(options.nonce, 10),
+            fee: parseFloat(options.fee),
+        });
+        console.log('Broadcasting stake transaction:', JSON.stringify(transaction, null, 2));
+        const result = await client.stakeTokens(transaction as StakeTransaction);
+        console.log('Broadcast result:', result);
+    } catch (error: any) {
+        console.error('Error staking tokens:', error.message);
+    }
+  });
+
+// --- Smart Contract Commands ---
+program
+  .command('deploy-contract')
+  .description('Deploy a WASM smart contract with optional initial state')
+  .requiredOption('-w, --wallet <path>', 'Path to the deployer wallet file')
+  .requiredOption('-c, --code <path>', 'Path to the WASM file')
+  .requiredOption('-n, --nonce <number>', 'The next nonce for the sender account')
+  .option('-i, --init-state <json_string>', 'Optional initial state for the contract as a JSON string')
+  .option('-f, --fee <number>', 'Transaction fee', '0')
+  .action(async (options) => {
+      try {
+        const code = fs.readFileSync(path.resolve(options.code), 'base64');
+        
+        let initialState: Record<string, any> | undefined = undefined;
+        if (options.initState) {
+            try {
+                initialState = JSON.parse(options.initState);
+            } catch (e: any) {
+                throw new Error(`Invalid JSON for initial state: ${e.message}`);
+            }
+        }
+        
+        const txPayload: any = {
+            type: TransactionType.CONTRACT_CREATION,
+            code,
+            nonce: parseInt(options.nonce, 10),
+            fee: parseFloat(options.fee),
+        };
+
+        if (initialState) {
+            txPayload.initialState = initialState;
+        }
+
+        const transaction = createSignedTransaction(options.wallet, txPayload);
+        
+        console.log('Broadcasting contract deployment:', JSON.stringify(transaction, null, 2));
+        
+        const result = await client.deployContract(transaction as ContractCreationTransaction);
+        console.log('Broadcast result:', result);
+        console.log(`\nContract deployment transaction sent. Its ID is ${transaction.id}`);
+
+      } catch (error: any) {
+          console.error('Error deploying contract:', error.message);
+      }
+  });
+
+// --- Governance Commands ---
+program
+  .command('submit-proposal')
+  .description('Submit a new governance proposal')
+  .requiredOption('-w, --wallet <path>', 'Path to the proposer wallet file')
+  .requiredOption('--title <title>', 'Title of the proposal')
+  .requiredOption('--description <desc>', 'Description of the proposal')
+  .requiredOption('--end-block <height>', 'Block height for voting to end')
+  .requiredOption('-n, --nonce <number>', 'The next nonce for the sender account')
+  .option('-f, --fee <number>', 'Transaction fee', '0')
+  .action(async (options) => {
+      try {
+        const transaction = createSignedTransaction(options.wallet, {
+            type: TransactionType.GOVERNANCE_PROPOSAL,
+            title: options.title,
+            description: options.description,
+            endBlock: parseInt(options.endBlock, 10),
+            nonce: parseInt(options.nonce, 10),
+            fee: parseFloat(options.fee),
+        });
+        console.log('Submitting proposal...');
+        const result = await client.submitGovernanceProposal(transaction as GovernanceProposalTransaction);
+        console.log('Broadcast result:', result);
+      } catch (error: any) {
+          console.error('Error submitting proposal:', error.message);
+      }
+  });
+
+program
+  .command('cast-vote')
+  .description('Cast a vote on a governance proposal')
+  .requiredOption('-w, --wallet <path>', 'Path to the voter wallet file')
+  .requiredOption('-p, --proposal-id <id>', 'ID of the proposal to vote on')
+  .requiredOption('-v, --vote <option>', 'The vote option: "yes", "no", or "abstain"')
+  .requiredOption('-n, --nonce <number>', 'The next nonce for the sender account')
+  .option('-f, --fee <number>', 'Transaction fee', '0')
+  .action(async (options) => {
+      try {
+        const voteOption = options.vote.toLowerCase();
+        if (!['yes', 'no', 'abstain'].includes(voteOption)) {
+            throw new Error('Invalid vote option. Must be one of "yes", "no", or "abstain".');
+        }
+        const transaction = createSignedTransaction(options.wallet, {
+            type: TransactionType.GOVERNANCE_VOTE,
+            proposalId: options.proposalId,
+            vote: voteOption,
+            nonce: parseInt(options.nonce, 10),
+            fee: parseFloat(options.fee),
+        });
+        console.log('Casting vote...');
+        const result = await client.castGovernanceVote(transaction as GovernanceVoteTransaction);
+        console.log('Broadcast result:', result);
+      } catch (error: any) {
+          console.error('Error casting vote:', error.message);
+      }
+  });
+
 
 program.parse(process.argv);

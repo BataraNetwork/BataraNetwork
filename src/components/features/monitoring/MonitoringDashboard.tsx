@@ -1,10 +1,39 @@
 import React from 'react';
-import { useNodeStatus } from '../../../hooks/useNodeStatus';
-import { Alert } from '../../../types';
-import { BellIcon } from '../../ui/icons';
+import { Alert, NodeStatus } from '../../../types';
+import { BellIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon } from '../../ui/icons';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
+
+interface MonitoringDashboardProps {
+  status: NodeStatus | undefined;
+  alerts: Alert[];
+  history: any[];
+  isLoading: boolean;
+  error: string | null;
+  availableNodes: { id: string, name: string, region: string }[];
+  activeNodeId: string;
+  setActiveNodeId: (id: string) => void;
+}
+
+const HealthStatusIndicator: React.FC<{ status: NodeStatus['healthStatus'] }> = ({ status }) => {
+  // FIX: Replaced `JSX.Element` with `React.ReactNode` to resolve "Cannot find namespace 'JSX'" error.
+  const styles: Record<NodeStatus['healthStatus'], { text: string; icon: React.ReactNode; label: string }> = {
+    ok: { text: 'text-green-400', icon: <CheckCircleIcon className="h-5 w-5" />, label: 'Healthy' },
+    degraded: { text: 'text-yellow-400', icon: <AlertTriangleIcon className="h-5 w-5" />, label: 'Degraded' },
+    unreachable: { text: 'text-red-400', icon: <XCircleIcon className="h-5 w-5" />, label: 'Unreachable' },
+  };
+
+  const currentStyle = styles[status];
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${currentStyle.text} bg-slate-800/60 border border-slate-700`}>
+      {currentStyle.icon}
+      <span>{currentStyle.label}</span>
+    </div>
+  );
+};
+
 
 const StatCard: React.FC<{ title: string; value: string | number; unit?: string }> = ({ title, value, unit }) => (
   <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 sm:p-6 transition-transform duration-200 hover:scale-105 hover:bg-slate-700/50">
@@ -23,9 +52,7 @@ const AlertCard: React.FC<{ alert: Alert }> = ({ alert }) => (
     </div>
 );
 
-export const MonitoringDashboard: React.FC = () => {
-  const { status, alerts, history, isLoading, error, availableNodes, activeNodeId, setActiveNodeId } = useNodeStatus();
-
+export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ status, alerts, history, isLoading, error, availableNodes, activeNodeId, setActiveNodeId }) => {
   if (isLoading) {
     return <div className="text-center p-8 text-slate-400">Loading node status...</div>;
   }
@@ -37,17 +64,20 @@ export const MonitoringDashboard: React.FC = () => {
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-            <h2 className="text-3xl font-bold text-white">Node Monitoring Dashboard</h2>
-            <p className="text-slate-400">Real-time enterprise metrics and alerts for the Bataranetwork.</p>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div>
+                <h2 className="text-3xl font-bold text-white">Node Monitoring</h2>
+                <p className="text-slate-400">Real-time enterprise metrics and alerts for the Bataranetwork.</p>
+            </div>
+            <HealthStatusIndicator status={status.healthStatus} />
         </div>
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 w-full sm:w-auto">
             <label htmlFor="node-selector" className="sr-only">Select a node</label>
             <select
                 id="node-selector"
                 value={activeNodeId}
                 onChange={(e) => setActiveNodeId(e.target.value)}
-                className="bg-slate-800 border border-slate-700 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
             >
                 {availableNodes.map(node => (
                     <option key={node.id} value={node.id}>
