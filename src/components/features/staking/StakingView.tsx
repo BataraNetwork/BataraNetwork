@@ -48,7 +48,7 @@ const ValidatorRow: React.FC<{ validator: Validator, onStake: (address: string, 
                         type="number"
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
-                        placeholder="Amount"
+                        placeholder="Amount (BTR)"
                         className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
                         disabled={!canStake}
                     />
@@ -68,12 +68,12 @@ export const StakingView: React.FC = () => {
         <div>
             <div className="mb-6">
                 <h2 className="text-3xl font-bold text-white">Staking & Validators</h2>
-                <p className="text-slate-400">Secure the network by staking your tokens with validators.</p>
+                <p className="text-slate-400">Secure the network by staking your BTR tokens with validators.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <StatCard title="Total Staked" value={totalStaked.toLocaleString()} />
-                <StatCard title="Your Stake" value={stakedAmount.toLocaleString()} />
+                <StatCard title="Total Staked (BTR)" value={totalStaked.toLocaleString()} />
+                <StatCard title="Your Stake (BTR)" value={stakedAmount.toLocaleString()} />
                 <StatCard title="Active Validators" value={validators.filter(v => v.status === 'active').length} />
             </div>
 
@@ -82,7 +82,7 @@ export const StakingView: React.FC = () => {
                     <thead className="bg-slate-800 text-left text-slate-400">
                         <tr>
                             <th className="p-4 font-semibold">Validator</th>
-                            <th className="p-4 font-semibold text-right">Total Stake</th>
+                            <th className="p-4 font-semibold text-right">Total Stake (BTR)</th>
                             <th className="p-4 font-semibold text-right">Commission</th>
                             <th className="p-4 font-semibold text-right">Uptime</th>
                             <th className="p-4 font-semibold text-center">Status</th>

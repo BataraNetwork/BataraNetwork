@@ -38,8 +38,8 @@ const Transactions: React.FC = () => {
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">Transaction ID</th>
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">From</th>
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">To</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-300">Amount</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-300">Fee</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-300">Amount (BTR)</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-300">Fee (BTR)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">

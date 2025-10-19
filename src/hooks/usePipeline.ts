@@ -16,7 +16,8 @@ let runIdCounter = 1;
 export const usePipeline = () => {
     const [currentRun, setCurrentRun] = useState<PipelineRun | null>(null);
     const [history, setHistory] = useState<PipelineRun[]>([]);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    // FIX: Replaced NodeJS.Timeout with ReturnType<typeof setTimeout> to make it environment-agnostic (works in browser and Node).
+    const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const updateStage = (stageIndex: number, newStatus: PipelineStage['status'], duration?: number) => {
         setCurrentRun(prev => {

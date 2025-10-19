@@ -52,6 +52,12 @@ export const ClipboardIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) =>
     </svg>
 );
 
+export const ClipboardListIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+);
+
 export const CheckIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -83,6 +89,12 @@ export const UsersIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
     </svg>
 );
 
+export const KeyIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H5v-2H3v-2H1.258a1 1 0 01-.97-1.243l1.258-7.549a1 1 0 01.97-1.243H7V5a2 2 0 012-2h3.172a2 2 0 011.414.586l.828.828A2 2 0 0015 7zm-8.257 6.13l1.543-1.543a2 2 0 012.828 0l1.543 1.543a2 2 0 010 2.828l-1.543 1.543a2 2 0 01-2.828 0l-1.543-1.543a2 2 0 010-2.828z" />
+    </svg>
+);
+
 export const ShieldCheckIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 20.944a11.955 11.955 0 0118 0a12.02 12.02 0 00-3.382-11.984z" />
@@ -110,5 +122,36 @@ export const ChevronDownIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) 
 export const ArrowRightIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+    </svg>
+);
+
+export const GavelIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664zM12 22V10m0 0l-3 3m3-3l3 3" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l1.028 1.028a4 4 0 005.656 0L12 2l2.316 2.316a4 4 0 005.656 0L21 3" />
+    </svg>
+);
+
+export const FilePlusIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+);
+
+export const DatabaseIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7l8 5 8-5M4 12l8 5 8-5" />
+    </svg>
+);
+
+export const CubeIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7v10l8 4m0-14V3" />
+    </svg>
+);
+
+export const CodeBracketIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
     </svg>
 );

@@ -123,13 +123,13 @@ program
 
 program
     .command('get-balance <address>')
-    .description('Get the balance of an account')
+    .description('Get the BTR balance of an account.')
     .option('-n, --node <url>', 'Node RPC URL', 'http://localhost:3000')
     .action(async (address, options) => {
         const client = new BataraApiClient(options.node);
         try {
             const account = await client.getAccount(address);
-            console.log(`Balance for ${address.substring(0, 20)}...: ${account.balance}`);
+            console.log(`Balance for ${address.substring(0, 20)}...: ${account.balance} BTR`);
         } catch (e: any) {
             console.error('Failed to get balance:', e.response?.data?.error || e.message);
         }
@@ -137,8 +137,8 @@ program
 
 program
     .command('transfer <to> <amount>')
-    .description('Transfer tokens to another address from your wallet')
-    .option('-f, --fee <fee>', 'Transaction fee', '1')
+    .description('Transfer an amount of BTR to another address.')
+    .option('-f, --fee <fee>', 'Transaction fee in BTR', '1')
     .option('-n, --node <url>', 'Node RPC URL', 'http://localhost:3000')
     .action(async (to, amountStr, options) => {
         const client = new BataraApiClient(options.node);

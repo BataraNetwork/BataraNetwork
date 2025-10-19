@@ -46,8 +46,8 @@ const TransactionDetail: React.FC = () => {
         <DetailRow label="Type" value={transaction.type} isMono={false} />
         <DetailRow label="From" value={transaction.from} />
         {transaction.to && <DetailRow label="To" value={transaction.to} />}
-        {typeof transaction.amount === 'number' && <DetailRow label="Amount" value={transaction.amount.toLocaleString()} isMono={false} />}
-        <DetailRow label="Fee" value={transaction.fee} isMono={false} />
+        {typeof transaction.amount === 'number' && <DetailRow label="Amount" value={`${transaction.amount.toLocaleString()} BTR`} isMono={false} />}
+        <DetailRow label="Fee" value={`${transaction.fee} BTR`} isMono={false} />
         <DetailRow label="Nonce" value={transaction.nonce} isMono={false} />
         <DetailRow label="Signature" value={transaction.signature} />
       </div>

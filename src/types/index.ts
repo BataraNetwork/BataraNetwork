@@ -119,9 +119,9 @@ export interface ContractInteraction {
 
 export type Permission = 
   // View permissions
-  | 'view:monitoring' | 'view:alerts' | 'view:logs' | 'view:generator' | 'view:security' | 'view:pipeline' | 'view:governance' | 'view:staking' | 'view:contracts' | 'view:team'
+  | 'view:monitoring' | 'view:alerts' | 'view:logs' | 'view:generator' | 'view:security' | 'view:pipeline' | 'view:governance' | 'view:staking' | 'view:contracts' | 'view:team' | 'view:api_keys' | 'view:audit_trail'
   // Action permissions
-  | 'action:generate' | 'action:scan' | 'action:acknowledge_alert' | 'action:trigger_pipeline' | 'action:approve_pipeline' | 'action:rollback_pipeline' | 'action:vote' | 'action:propose' | 'action:stake' | 'action:call_contract'
+  | 'action:generate' | 'action:scan' | 'action:acknowledge_alert' | 'action:trigger_pipeline' | 'action:approve_pipeline' | 'action:rollback_pipeline' | 'action:vote' | 'action:propose' | 'action:stake' | 'action:call_contract' | 'action:manage_api_keys'
   // Admin permissions
   | 'admin:manage_team';
 
@@ -129,7 +129,7 @@ export type Permission =
 export interface User {
   id: string;
   name: string;
-  role: 'SRE' | 'Developer' | 'Auditor' | 'Admin';
+  role: 'DevOps Engineer' | 'Developer' | 'Auditor' | 'Administrator';
   avatar: string;
   permissions: Set<Permission>;
 }
@@ -147,7 +147,7 @@ export interface ApiKey {
 
 // --- Audit ---
 
-export interface AuditLog {
+export interface AuditEvent {
   id: string;
   user: string;
   action: string;

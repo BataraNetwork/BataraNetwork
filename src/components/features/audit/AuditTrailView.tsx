@@ -1,30 +1,19 @@
 import React, { useState, useMemo } from 'react';
-import { AuditLog } from '../../../types';
+// FIX: The correct type is AuditEvent, not AuditLog.
+import { AuditEvent } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
 
-// Mock hook for audit trail data
-const useAuditTrail = () => {
-    const [logs] = useState<AuditLog[]>([
-        { id: '1', user: 'Alice (SRE)', action: 'Triggered Pipeline', timestamp: new Date(Date.now() - 3600000).toLocaleString(), details: { runId: 101 } },
-        { id: '2', user: 'Bob (Developer)', action: 'Generated Config', timestamp: new Date(Date.now() - 7200000).toLocaleString(), details: { type: 'Dockerfile' } },
-        { id: '3', user: 'Dana (Admin)', action: 'Revoked API Key', timestamp: new Date(Date.now() - 86400000).toLocaleString(), details: { keyName: 'Stale Key' } },
-        { id: '4', user: 'Charlie (Auditor)', action: 'Ran Security Scan', timestamp: new Date(Date.now() - 172800000).toLocaleString(), details: { findings: 2 } },
-        { id: '5', user: 'Alice (SRE)', action: 'Approved Pipeline Stage', timestamp: new Date(Date.now() - 345600000).toLocaleString(), details: { runId: 98, stage: 'Deploy to Production' } },
-        { id: '6', user: 'Dana (Admin)', action: 'Voted on Proposal', timestamp: new Date(Date.now() - 604800000).toLocaleString(), details: { proposalId: 'BIP-42', vote: 'yes' } },
-    ]);
-    return { logs };
-};
 
-
-export const AuditTrailView: React.FC = () => {
-    const { logs } = useAuditTrail();
+// FIX: Removed internal mock data hook and updated component to use props.
+// This makes the component reusable and allows it to display real audit events passed from App.tsx.
+export const AuditTrailView: React.FC<{ events: AuditEvent[] }> = ({ events }) => {
     const { users } = useAuth();
     const [filterUser, setFilterUser] = useState('');
 
     const filteredLogs = useMemo(() => {
-        if (!filterUser) return logs;
-        return logs.filter(log => log.user === filterUser);
-    }, [logs, filterUser]);
+        if (!filterUser) return events;
+        return events.filter(log => log.user === filterUser);
+    }, [events, filterUser]);
     
     return (
         <div>
