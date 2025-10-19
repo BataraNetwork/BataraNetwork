@@ -1,13 +1,5 @@
 import { useState, useCallback } from 'react';
-
-export interface Validator {
-    address: string;
-    name: string;
-    stake: number;
-    commission: number;
-    uptime: number;
-    status: 'active' | 'inactive';
-}
+import { Validator } from '../types';
 
 const MOCK_VALIDATORS: Validator[] = [
     { address: '0xValidator...1a2b3c', name: 'CosmoStation', stake: 12500000, commission: 5, uptime: 99.98, status: 'active' },

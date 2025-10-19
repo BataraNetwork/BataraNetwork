@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useStaking, Validator } from '../../../hooks/useStaking';
+import { useStaking } from '../../../hooks/useStaking';
+import { Validator } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
-import { CheckCircleIcon, XCircleIcon, PlusCircleIcon, ArrowRightIcon } from '../../ui/icons';
+import { CheckCircleIcon, XCircleIcon, ArrowRightIcon } from '../../ui/icons';
 
 const StatCard: React.FC<{ title: string; value: string | number; }> = ({ title, value }) => (
     <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
@@ -61,9 +62,18 @@ const ValidatorRow: React.FC<{ validator: Validator, onStake: (address: string, 
     );
 };
 
-export const StakingView: React.FC = () => {
+export const StakingView: React.FC<{ logAction: (action: string, details: Record<string, any>) => void }> = ({ logAction }) => {
     const { validators, totalStaked, stakedAmount, stakeTokens } = useStaking();
     
+    const handleStakeTokens = (address: string, amount: number) => {
+        const validator = validators.find(v => v.address === address);
+        stakeTokens(address, amount);
+        logAction('staking.stake', { 
+            validator: validator?.name || address,
+            amount: amount 
+        });
+    };
+
     return (
         <div>
             <div className="mb-6">
@@ -90,7 +100,7 @@ export const StakingView: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {validators.map(v => <ValidatorRow key={v.address} validator={v} onStake={stakeTokens} />)}
+                        {validators.map(v => <ValidatorRow key={v.address} validator={v} onStake={handleStakeTokens} />)}
                     </tbody>
                 </table>
              </div>

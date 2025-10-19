@@ -9,13 +9,14 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "jest --config jest.config.js",
+    "clean": "node scripts/clean.mjs",
     "build:all": "pnpm -r build",
     "lint:all": "pnpm -r lint",
     "dev:node": "pnpm --filter bataranetwork-node dev",
     "dev:explorer:be": "pnpm --filter explorer-backend dev",
     "dev:explorer:fe": "pnpm --filter explorer-frontend dev",
     "dev:cli": "pnpm --filter bataranetwork-cli dev",
-    "dev:all": "pnpm -r --parallel dev"
+    "dev:all": "node scripts/dev.mjs"
   },
   "dependencies": {
     "react": "^19.2.0",
