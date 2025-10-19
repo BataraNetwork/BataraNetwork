@@ -1,110 +1,129 @@
-import { useState, useEffect, useCallback } from 'react';
-import { PipelineStage, PipelineStatus, PipelineRun } from '../types';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { PipelineRun, PipelineStage } from '../types';
 
-const PIPELINE_TEMPLATE: PipelineStage[] = [
-    { name: 'Checkout', status: 'pending' },
-    { name: 'Install Dependencies', status: 'pending' },
-    { name: 'Lint & Test', status: 'pending' },
-    { name: 'Build Image', status: 'pending' },
-    { name: 'Push to Registry', status: 'pending' },
-    { name: 'Manual Approval (Staging)', status: 'pending' },
-    { name: 'Deploy to Production', status: 'pending' },
+const STAGES: PipelineStage['name'][] = [
+    'Checkout',
+    'Build',
+    'Lint & Static Analysis',
+    'Unit & Integration Tests',
+    'Security Scan',
+    'Deploy to Production',
+    'Smoke Tests'
 ];
 
-let runCounter = 1;
+let runIdCounter = 1;
 
 export const usePipeline = () => {
-  const [currentRun, setCurrentRun] = useState<PipelineRun | null>(null);
-  const [history, setHistory] = useState<PipelineRun[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  
-  const updateRunStatus = useCallback((runId: number, status: PipelineStatus, stages?: PipelineStage[]) => {
-      const update = (run: PipelineRun) => ({
-          ...run,
-          status,
-          stages: stages || run.stages,
-      });
+    const [currentRun, setCurrentRun] = useState<PipelineRun | null>(null);
+    const [history, setHistory] = useState<PipelineRun[]>([]);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-      if (currentRun && currentRun.id === runId) {
-          setCurrentRun(prev => prev ? update(prev) : null);
-      }
-      setHistory(prev => prev.map(r => r.id === runId ? update(r) : r));
-  }, [currentRun]);
-
-
-  const runStage = useCallback((runId: number, stageIndex: number) => {
-    if (!currentRun || currentRun.id !== runId || stageIndex >= currentRun.stages.length) {
-      if(currentRun) updateRunStatus(runId, 'success');
-      setIsRunning(false);
-      return;
-    }
-
-    const currentStage = currentRun.stages[stageIndex];
-    if (currentStage.status === 'approval') {
-        updateRunStatus(runId, 'approval');
-        return; // Pause execution
-    }
-
-    const updatedStages = currentRun.stages.map((s, i) => i === stageIndex ? { ...s, status: 'running' } : s);
-    setCurrentRun(prev => prev ? { ...prev, stages: updatedStages } : null);
-
-    setTimeout(() => {
-        // Simulate potential failure
-        const didFail = Math.random() < 0.1 && stageIndex > 0;
-        const newStatus = didFail ? 'failed' : 'success';
-
-        const finalStages = currentRun.stages.map((s, i) => 
-            i === stageIndex ? { ...s, status: newStatus, duration: `${Math.floor(Math.random() * 20 + 5)}s` } : s
-        );
-        setCurrentRun(prev => prev ? { ...prev, stages: finalStages } : null);
-
-        if (didFail) {
-            updateRunStatus(runId, 'failed', finalStages);
-            setIsRunning(false);
-        } else {
-            runStage(runId, stageIndex + 1);
-        }
-    }, 1500);
-  }, [currentRun, updateRunStatus]);
-
-  const runPipeline = () => {
-    setIsRunning(true);
-    const newRun: PipelineRun = {
-        id: runCounter++,
-        triggeredAt: new Date().toLocaleString(),
-        status: 'running',
-        stages: PIPELINE_TEMPLATE.map(s => ({...s})),
+    const updateStage = (stageIndex: number, newStatus: PipelineStage['status'], duration?: number) => {
+        setCurrentRun(prev => {
+            if (!prev) return null;
+            const newStages = [...prev.stages];
+            newStages[stageIndex] = { ...newStages[stageIndex], status: newStatus, duration };
+            return { ...prev, stages: newStages };
+        });
     };
-    setCurrentRun(newRun);
-    setHistory(prev => [newRun, ...prev.slice(0, 4)]); // Keep last 5 runs
-    runStage(newRun.id, 0);
-  };
-
-  const approveStage = () => {
-    if (!currentRun || currentRun.status !== 'approval') return;
-    const approvalStageIndex = currentRun.stages.findIndex(s => s.status === 'approval');
-    if (approvalStageIndex === -1) return;
     
-    const updatedStages = currentRun.stages.map((s, i) => i === approvalStageIndex ? { ...s, status: 'success', duration: '2s' } : s);
-    setCurrentRun(prev => prev ? { ...prev, stages: updatedStages, status: 'running' } : null);
+    const setRunStatus = (status: PipelineRun['status']) => {
+        setCurrentRun(prev => prev ? { ...prev, status } : null);
+    }
     
-    runStage(currentRun.id, approvalStageIndex + 1);
-  };
+    const stopRun = (finalStatus: 'success' | 'failed') => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setRunStatus(finalStatus);
+        
+        setCurrentRun(prev => {
+            if (prev) {
+                 setHistory(h => [{...prev, status: finalStatus}, ...h]);
+            }
+            return prev;
+        });
+    };
 
-  const rejectStage = () => {
-    if (!currentRun || currentRun.status !== 'approval') return;
-    const approvalStageIndex = currentRun.stages.findIndex(s => s.status === 'approval');
-    if (approvalStageIndex === -1) return;
+    const runStage = useCallback((stageIndex: number) => {
+        if (stageIndex >= STAGES.length) {
+            stopRun('success');
+            return;
+        }
 
-    const updatedStages = currentRun.stages.map((s, i) => i === approvalStageIndex ? { ...s, status: 'failed', duration: '1s' } : s);
-    updateRunStatus(currentRun.id, 'failed', updatedStages);
-    setIsRunning(false);
-  };
+        const stageName = STAGES[stageIndex];
+        if (stageName === 'Deploy to Production') {
+            updateStage(stageIndex, 'approval');
+            setRunStatus('approval');
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            return;
+        }
 
-  const rollback = (runId: number) => {
-      // This is a simulation
-      alert(`Simulating rollback for deployment from Run #${runId}.`);
-  };
+        updateStage(stageIndex, 'running');
+        const startTime = Date.now();
 
-  return { currentRun, history, isRunning, runPipeline, approveStage, rejectStage, rollback };
+        intervalRef.current = setTimeout(() => {
+            const duration = (Date.now() - startTime) / 1000;
+            // Simulate random failure
+            if (Math.random() < 0.1 && stageIndex > 0) { // Never fail on checkout
+                updateStage(stageIndex, 'failed', duration);
+                stopRun('failed');
+            } else {
+                updateStage(stageIndex, 'success', duration);
+                runStage(stageIndex + 1);
+            }
+        }, 1500);
+    }, []);
+
+
+    const runPipeline = useCallback(() => {
+        if (currentRun?.status === 'running' || currentRun?.status === 'approval') return;
+
+        const newRun: PipelineRun = {
+            id: runIdCounter++,
+            status: 'running',
+            triggeredBy: 'Alice (SRE)',
+            startTime: new Date().toLocaleString(),
+            stages: STAGES.map(name => ({ name, status: 'pending' }))
+        };
+
+        setCurrentRun(newRun);
+        setHistory(prev => [newRun, ...prev]);
+
+        runStage(0);
+
+    }, [currentRun, runStage]);
+
+    const approveStage = () => {
+        const approvalStageIndex = currentRun?.stages.findIndex(s => s.status === 'approval');
+        if (currentRun?.status !== 'approval' || approvalStageIndex === undefined || approvalStageIndex === -1) return;
+        
+        updateStage(approvalStageIndex, 'success', 0.5);
+        setRunStatus('running');
+        runStage(approvalStageIndex + 1);
+    };
+
+    const rejectStage = () => {
+        const approvalStageIndex = currentRun?.stages.findIndex(s => s.status === 'approval');
+        if (currentRun?.status !== 'approval' || approvalStageIndex === undefined || approvalStageIndex === -1) return;
+
+        updateStage(approvalStageIndex, 'failed', 0.5);
+        stopRun('failed');
+    };
+    
+    useEffect(() => {
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
+    }, []);
+
+
+    return {
+        currentRun,
+        history,
+        isRunning: currentRun?.status === 'running' || currentRun?.status === 'approval',
+        runPipeline,
+        approveStage,
+        rejectStage,
+    };
 };

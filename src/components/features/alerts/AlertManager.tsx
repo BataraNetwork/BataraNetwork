@@ -1,201 +1,176 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Alert } from '../../../types';
-import { CheckCircleIcon, FilterIcon, SparklesIcon } from '../../ui/icons';
+import { BellIcon, SparklesIcon, ChevronDownIcon, CheckCircleIcon } from '../../ui/icons';
+import { useAuth } from '../../../hooks/useAuth';
 import { generateRemediationPlan } from '../../../services/geminiService';
+import { useApiKey } from '../../../hooks/useApiKey';
+import { ApiKeyPrompt } from '../../ui/ApiKeyPrompt';
 
-type AlertStatusFilter = 'all' | 'active' | 'acknowledged';
-type AlertSeverityFilter = 'all' | 'critical' | 'warning';
+const AlertCard: React.FC<{
+  alert: Alert;
+  onResolve: (id: string) => void;
+  onGeneratePlan: (alert: Alert) => void;
+  isPlanLoading: boolean;
+  canAcknowledge: boolean;
+}> = ({ alert, onResolve, onGeneratePlan, isPlanLoading, canAcknowledge }) => {
+  const styles = {
+    critical: 'bg-red-500/10 text-red-400 border-red-500/50',
+    warning: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/50',
+  };
 
-interface AlertManagerProps {
-  alerts: Alert[];
-  onAcknowledge: (alertId: string) => void;
-  nodes: { id: string; name: string }[];
-}
-
-const getSeverityStyles = (severity: Alert['severity']) => {
-  switch (severity) {
-    case 'critical':
-      return { bg: 'bg-red-500/10', border: 'border-red-500/50', text: 'text-red-400' };
-    case 'warning':
-    default:
-      return { bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', text: 'text-yellow-400' };
-  }
+  return (
+    <div className={`p-4 rounded-lg border-l-4 ${styles[alert.severity]}`}>
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="font-bold">{alert.severity.toUpperCase()}</p>
+          <p className="text-slate-300 text-sm mt-1">{alert.message}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Node: {alert.nodeId} | Triggered at: {new Date(alert.timestamp).toLocaleString()}
+          </p>
+        </div>
+        {alert.status === 'active' && (
+          <button
+            onClick={() => onResolve(alert.id)}
+            disabled={!canAcknowledge}
+            className="text-xs bg-slate-700 text-slate-300 hover:bg-slate-600 rounded-md px-3 py-1 ml-4 flex-shrink-0 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Acknowledge
+          </button>
+        )}
+      </div>
+      {alert.status === 'active' && (
+        <div className="mt-3 pt-3 border-t border-slate-700/50">
+          <button
+            onClick={() => onGeneratePlan(alert)}
+            disabled={isPlanLoading}
+            className="text-sm font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1 disabled:opacity-50"
+          >
+            <SparklesIcon className="h-4 w-4" />
+            {isPlanLoading ? 'Generating...' : 'Generate AI Remediation Plan'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
 
-const getStatusStyles = (status: Alert['status']) => {
-    switch (status) {
-      case 'active':
-        return { bg: 'bg-yellow-500/10', text: 'text-yellow-400' };
-      case 'acknowledged':
-      default:
-        return { bg: 'bg-green-500/10', text: 'text-green-400' };
+const RemediationPlanModal: React.FC<{ plan: string; onClose: () => void, isLoading: boolean }> = ({ plan, onClose, isLoading }) => (
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="flex justify-between items-center p-4 border-b border-slate-700">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <SparklesIcon className="text-sky-400" />
+          AI-Generated Remediation Plan
+        </h3>
+        <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+      <div className="p-6 overflow-y-auto">
+        {isLoading ? (
+            <div className="text-center animate-pulse text-sky-400">Generating plan from alert data...</div>
+        ) : (
+            <pre className="whitespace-pre-wrap font-sans text-slate-300">{plan}</pre>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+export const AlertManager: React.FC<{ alerts: Alert[] }> = ({ alerts: allAlerts }) => {
+  const [alerts, setAlerts] = useState(allAlerts);
+  const [isPlanModalOpen, setPlanModalOpen] = useState(false);
+  const [remediationPlan, setRemediationPlan] = useState('');
+  const [isPlanLoading, setPlanLoading] = useState(false);
+  const { currentUser } = useAuth();
+  const { isApiKeyConfigured } = useApiKey();
+  const canAcknowledge = currentUser.permissions.has('action:acknowledge_alert');
+
+  useState(() => {
+    setAlerts(allAlerts);
+  });
+
+  const handleResolve = (id: string) => {
+    setAlerts(prev => prev.map(a => (a.id === id ? { ...a, status: 'resolved' } : a)));
+  };
+
+  const handleGeneratePlan = useCallback(async (alert: Alert) => {
+    if (!isApiKeyConfigured) return;
+    setRemediationPlan('');
+    setPlanModalOpen(true);
+    setPlanLoading(true);
+    try {
+      const plan = await generateRemediationPlan(alert);
+      setRemediationPlan(plan);
+    } catch (error: any) {
+      setRemediationPlan(`Failed to generate plan: ${error.message}`);
+    } finally {
+      setPlanLoading(false);
     }
-  };
+  }, [isApiKeyConfigured]);
 
-export const AlertManager: React.FC<AlertManagerProps> = ({ alerts, onAcknowledge, nodes }) => {
-    const [statusFilter, setStatusFilter] = useState<AlertStatusFilter>('all');
-    const [severityFilter, setSeverityFilter] = useState<AlertSeverityFilter>('all');
-    const [selectedAlertForPlan, setSelectedAlertForPlan] = useState<Alert | null>(null);
-    const [remediationPlan, setRemediationPlan] = useState<string>('');
-    const [isLoadingPlan, setIsLoadingPlan] = useState(false);
-    
-    const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n.name])), [nodes]);
-
-    const filteredAlerts = useMemo(() => {
-        return alerts.filter(alert => {
-            const statusMatch = statusFilter === 'all' || alert.status === statusFilter;
-            const severityMatch = severityFilter === 'all' || alert.severity === severityFilter;
-            return statusMatch && severityMatch;
-        });
-    }, [alerts, statusFilter, severityFilter]);
-
-    const handleGeneratePlan = async (alert: Alert) => {
-        setSelectedAlertForPlan(alert);
-        setIsLoadingPlan(true);
-        setRemediationPlan('');
-        try {
-            const plan = await generateRemediationPlan(alert);
-            setRemediationPlan(plan);
-        } catch (error: any) {
-            setRemediationPlan(`Failed to generate remediation plan: ${error.message}`);
-        } finally {
-            setIsLoadingPlan(false);
-        }
-    };
-
-    const closeModal = () => {
-        setSelectedAlertForPlan(null);
-        setRemediationPlan('');
-    };
-
-    const RemediationModal = () => {
-      if (!selectedAlertForPlan) return null;
-  
-      return (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeModal}>
-              <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                  <div className="flex justify-between items-center p-4 border-b border-slate-700">
-                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                          <SparklesIcon className="text-sky-400" />
-                          AI-Generated Remediation Plan
-                      </h3>
-                      <button onClick={closeModal} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
-                  </div>
-                  <div className="p-6 overflow-y-auto">
-                      {isLoadingPlan ? (
-                          <div className="text-center">
-                              <p className="animate-pulse text-sky-400">Generating plan...</p>
-                              <p className="text-sm text-slate-500 mt-2">The AI is analyzing the alert and crafting a response.</p>
-                          </div>
-                      ) : (
-                          <pre className="whitespace-pre-wrap font-sans text-slate-300">{remediationPlan}</pre>
-                      )}
-                  </div>
-                  <div className="p-4 border-t border-slate-700 text-right">
-                      <button onClick={closeModal} className="bg-slate-700 text-white font-semibold rounded-md px-4 py-2 hover:bg-slate-600 transition-colors">
-                          Close
-                      </button>
-                  </div>
-              </div>
-          </div>
-      );
-  };
-
+  const activeAlerts = alerts.filter(a => a.status === 'active');
+  const resolvedAlerts = alerts.filter(a => a.status === 'resolved');
 
   return (
     <div>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div>
-                <h2 className="text-3xl font-bold text-white">Alert Management</h2>
-                <p className="text-slate-400">View and acknowledge system-wide alerts.</p>
+      {isPlanModalOpen && <RemediationPlanModal plan={remediationPlan} onClose={() => setPlanModalOpen(false)} isLoading={isPlanLoading} />}
+
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold text-white flex items-center gap-3"><BellIcon /> Alert Manager</h2>
+        <p className="text-slate-400">View and manage active and resolved alerts from all nodes.</p>
+      </div>
+      
+      {!isApiKeyConfigured && <ApiKeyPrompt />}
+
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-xl font-bold text-white mb-4">Active Alerts ({activeAlerts.length})</h3>
+          {activeAlerts.length > 0 ? (
+            <div className="space-y-4">
+              {activeAlerts.map(alert => (
+                <AlertCard
+                  key={alert.id}
+                  alert={alert}
+                  onResolve={handleResolve}
+                  onGeneratePlan={handleGeneratePlan}
+                  isPlanLoading={isPlanLoading}
+                  canAcknowledge={canAcknowledge && isApiKeyConfigured}
+                />
+              ))}
             </div>
+          ) : (
+            <div className="text-center p-8 bg-slate-800/50 border border-slate-700 rounded-lg">
+              <p className="text-slate-400">No active alerts. All systems are nominal.</p>
+            </div>
+          )}
         </div>
         
-        <div className="p-3 mb-4 bg-sky-500/10 text-sky-400 border border-sky-500/50 rounded-lg text-sm" role="status">
-            <p>
-                <span className="font-semibold">Auto-Acknowledge Active:</span> Alerts are automatically acknowledged when the associated node becomes healthy or after 1 hour of inactivity.
-            </p>
-        </div>
-
-        {/* Filter Bar */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-4 flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex items-center gap-2 flex-wrap">
-                <FilterIcon className="text-slate-400" />
-                <span className="text-sm font-semibold mr-2">Status:</span>
-                {(['all', 'active', 'acknowledged'] as AlertStatusFilter[]).map(status => (
-                    <button key={status} onClick={() => setStatusFilter(status)}
-                        className={`text-xs px-3 py-1 rounded-full border transition capitalize ${statusFilter === status ? 'bg-sky-500/20 border-sky-500 text-sky-400' : 'bg-slate-700/50 border-slate-700 text-slate-400'}`}>
-                        {status}
-                    </button>
-                ))}
-            </div>
-             <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold mr-2">Severity:</span>
-                {(['all', 'critical', 'warning'] as AlertSeverityFilter[]).map(sev => (
-                    <button key={sev} onClick={() => setSeverityFilter(sev)}
-                        className={`text-xs px-3 py-1 rounded-full border transition capitalize ${severityFilter === sev ? 'bg-sky-500/20 border-sky-500 text-sky-400' : 'bg-slate-700/50 border-slate-700 text-slate-400'}`}>
-                        {sev}
-                    </button>
-                ))}
-            </div>
-        </div>
-
-        {/* Alerts Table */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-x-auto">
-            <table className="min-w-full">
-                <thead className="bg-slate-800">
-                    <tr>
-                        <th className="py-3 px-4 text-left text-sm font-semibold text-slate-300">Severity</th>
-                        <th className="py-3 px-4 text-left text-sm font-semibold text-slate-300">Status</th>
-                        <th className="py-3 px-4 text-left text-sm font-semibold text-slate-300">Node</th>
-                        <th className="py-3 px-4 text-left text-sm font-semibold text-slate-300">Message</th>
-                        <th className="py-3 px-4 text-left text-sm font-semibold text-slate-300">Timestamp</th>
-                        <th className="py-3 px-4 text-left text-sm font-semibold text-slate-300">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700">
-                    {filteredAlerts.map(alert => (
-                        <tr key={alert.id} className="hover:bg-slate-800/50 transition-colors">
-                            <td className="py-3 px-4">
-                                <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${getSeverityStyles(alert.severity).bg} ${getSeverityStyles(alert.severity).text}`}>
-                                    {alert.severity}
-                                </span>
-                            </td>
-                             <td className="py-3 px-4">
-                                <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${getStatusStyles(alert.status).bg} ${getStatusStyles(alert.status).text}`}>
-                                    {alert.status}
-                                </span>
-                            </td>
-                            <td className="py-3 px-4 text-sm text-slate-300">{nodeMap.get(alert.nodeId) || alert.nodeId}</td>
-                            <td className="py-3 px-4 text-sm text-slate-300">{alert.message}</td>
-                            <td className="py-3 px-4 text-sm text-slate-400">{new Date(alert.timestamp).toLocaleString()}</td>
-                            <td className="py-3 px-4">
-                               <div className="flex items-center gap-4">
-                                {alert.status === 'active' && (
-                                    <button onClick={() => onAcknowledge(alert.id)} className="flex items-center gap-1 text-sm text-green-400 hover:text-green-300 transition" title="Acknowledge">
-                                        <CheckCircleIcon />
-                                        Ack
-                                    </button>
-                                )}
-                                {alert.status === 'active' && (
-                                    <button onClick={() => handleGeneratePlan(alert)} className="flex items-center gap-1 text-sm text-sky-400 hover:text-sky-300 transition" title="Generate AI Remediation Plan">
-                                        <SparklesIcon />
-                                        AI Plan
-                                    </button>
-                                )}
-                               </div>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {filteredAlerts.length === 0 && (
-                <div className="text-center p-8 text-slate-500">
-                    <p>No alerts match the current filters.</p>
+        <div>
+           <details className="bg-slate-800/50 border border-slate-700 rounded-lg">
+                <summary className="p-4 cursor-pointer flex justify-between items-center text-xl font-bold text-white">
+                    Resolved Alerts ({resolvedAlerts.length})
+                    <ChevronDownIcon className="transition-transform duration-200" />
+                </summary>
+                <div className="p-4 border-t border-slate-700">
+                    {resolvedAlerts.length > 0 ? (
+                         <div className="space-y-4 max-h-96 overflow-y-auto">
+                            {resolvedAlerts.map(alert => (
+                                <div key={alert.id} className="p-3 bg-slate-800 rounded-lg flex items-center gap-3">
+                                    <CheckCircleIcon className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                    <div>
+                                        <p className="text-sm text-slate-400">{alert.message}</p>
+                                        <p className="text-xs text-slate-500">Resolved at {new Date(alert.timestamp).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-slate-500 text-center py-4">No recently resolved alerts.</p>
+                    )}
                 </div>
-            )}
+           </details>
         </div>
-        {selectedAlertForPlan && <RemediationModal />}
+
+      </div>
     </div>
   );
 };

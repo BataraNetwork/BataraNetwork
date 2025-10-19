@@ -14,16 +14,19 @@ type ConfigType = typeof CONFIG_TYPES[number];
 interface GeneratorFormProps {
   onGenerate: (options: { prompt: string; configType: ConfigType; includeHpa?: boolean }) => void;
   isLoading: boolean;
+  isActionAllowed: boolean;
 }
 
-export const GeneratorForm: React.FC<GeneratorFormProps> = ({ onGenerate, isLoading }) => {
+export const GeneratorForm: React.FC<GeneratorFormProps> = ({ onGenerate, isLoading, isActionAllowed }) => {
   const [prompt, setPrompt] = useState('');
   const [configType, setConfigType] = useState<ConfigType>(CONFIG_TYPES[0]);
   const [includeHpa, setIncludeHpa] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onGenerate({ prompt, configType, includeHpa });
+    if (isActionAllowed) {
+        onGenerate({ prompt, configType, includeHpa });
+    }
   };
 
   const placeholderMap: Record<ConfigType, string> = {
@@ -51,7 +54,7 @@ export const GeneratorForm: React.FC<GeneratorFormProps> = ({ onGenerate, isLoad
                     ? 'bg-sky-500/20 border-sky-500 text-sky-400'
                     : 'bg-slate-700/50 border-slate-600 text-slate-400 hover:bg-slate-700'
                 }`}
-                disabled={isLoading}
+                disabled={isLoading || !isActionAllowed}
               >
                 {type}
               </button>
@@ -65,13 +68,14 @@ export const GeneratorForm: React.FC<GeneratorFormProps> = ({ onGenerate, isLoad
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder={placeholderMap[configType] || "Add specific instructions..."}
-            className="flex-grow bg-slate-800 border border-slate-600 text-white rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
-            disabled={isLoading}
+            className="flex-grow bg-slate-800 border border-slate-600 text-white rounded-md px-4 py-3 focus:outline-none focus:ring-2 focus:ring-sky-500 transition disabled:opacity-50"
+            disabled={isLoading || !isActionAllowed}
             />
             <button
             type="submit"
             className="bg-sky-600 text-white font-semibold rounded-md px-6 py-3 hover:bg-sky-500 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed"
-            disabled={isLoading}
+            disabled={isLoading || !isActionAllowed}
+            title={!isActionAllowed ? 'Permission Denied' : 'Generate Configuration'}
             >
             {isLoading ? 'Generating...' : 'Generate with AI'}
             </button>
@@ -87,8 +91,8 @@ export const GeneratorForm: React.FC<GeneratorFormProps> = ({ onGenerate, isLoad
                 id="includeHpa"
                 checked={includeHpa}
                 onChange={(e) => setIncludeHpa(e.target.checked)}
-                disabled={isLoading}
-                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-600 focus:ring-sky-500"
+                disabled={isLoading || !isActionAllowed}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-600 focus:ring-sky-500 disabled:opacity-50"
             />
             <label htmlFor="includeHpa" className="ml-2 text-sm text-slate-400">
                 Include Horizontal Pod Autoscaler (HPA) <span className="text-xs text-slate-500">(for Kubernetes/Helm)</span>

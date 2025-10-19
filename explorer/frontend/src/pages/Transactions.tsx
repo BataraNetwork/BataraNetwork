@@ -11,7 +11,7 @@ const Transactions: React.FC = () => {
     const fetchTransactions = async () => {
       try {
         setIsLoading(true);
-        const txsData = await getTransactions(20); // Fetch latest 20 transactions
+        const txsData = await getTransactions(50); // Fetch latest 50 pending txs
         setTransactions(txsData);
         setError(null);
       } catch (err) {
@@ -35,28 +35,34 @@ const Transactions: React.FC = () => {
         <table className="min-w-full">
           <thead className="bg-gray-700/50">
             <tr>
-              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">ID</th>
+              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">Transaction ID</th>
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">From</th>
               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">To</th>
               <th className="py-3 px-4 text-right text-sm font-semibold text-gray-300">Amount</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-300">Fee</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">
             {transactions.map(tx => (
               <tr key={tx.id} className="hover:bg-gray-700/50 transition-colors">
                 <td className="py-3 px-4 font-mono text-sm truncate" style={{ maxWidth: '200px' }}>
-                  <Link to={`/tx/${tx.id}`} className="text-green-400 hover:underline">
+                  <Link to={`/tx/${tx.id}`} className="text-blue-400 hover:underline">
                     {tx.id}
                   </Link>
                 </td>
                 <td className="py-3 px-4 font-mono text-sm truncate" style={{ maxWidth: '200px' }}>{tx.from}</td>
-                <td className="py-3 px-4 font-mono text-sm truncate" style={{ maxWidth: '200px' }}>{tx.to}</td>
-                <td className="py-3 px-4 text-right">{tx.amount}</td>
+                <td className="py-3 px-4 font-mono text-sm truncate" style={{ maxWidth: '200px' }}>{tx.to || 'N/A'}</td>
+                <td className="py-3 px-4 text-right font-mono text-sm">{tx.amount ? tx.amount.toLocaleString() : 'N/A'}</td>
+                <td className="py-3 px-4 text-right font-mono text-sm">{tx.fee}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {transactions.length === 0 && <p className="text-center p-4 text-gray-500">No pending transactions in the mempool.</p>}
+        {transactions.length === 0 && (
+            <div className="text-center p-8 text-gray-500">
+                <p>No pending transactions found in the mempool.</p>
+            </div>
+        )}
       </div>
     </div>
   );

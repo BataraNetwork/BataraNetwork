@@ -1,62 +1,54 @@
 import { useState, useCallback } from 'react';
 import { analyzeConfiguration } from '../services/geminiService';
-import { SecurityFinding, ScanResult } from '../types';
+import { SecurityFinding } from '../types';
+
+const MOCK_FINDINGS: SecurityFinding[] = [
+  {
+    id: 'mock-1',
+    severity: 'High',
+    description: 'The Docker image is running as the root user.',
+    recommendation: 'Create a dedicated user and group in the Dockerfile. Use the USER instruction to switch to this non-root user before running the application.',
+    muted: false,
+  },
+  {
+    id: 'mock-2',
+    severity: 'Medium',
+    description: 'No health check is defined for the container.',
+    recommendation: 'Add a HEALTHCHECK instruction to the Dockerfile to ensure the container is functioning correctly before it receives traffic.',
+    muted: false,
+  }
+];
+
 
 export const useSecurityScanner = () => {
-    const [currentScan, setCurrentScan] = useState<ScanResult | null>(null);
-    const [history, setHistory] = useState<ScanResult[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const [findings, setFindings] = useState<SecurityFinding[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const scanContent = useCallback(async (content: string, fileName: string = 'pasted_content') => {
-        if (!content.trim()) {
-            setError("Cannot scan empty content.");
-            setCurrentScan(null);
-            return;
-        }
+  const scan = useCallback(async (content: string) => {
+    if (!content.trim()) {
+        setFindings([]);
+        return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const results = await analyzeConfiguration(content);
+      setFindings(results);
+    } catch (e: any) {
+      console.error("AI security scan failed, falling back to mock data.", e);
+      setError(`Live AI analysis failed: ${e.message}. Displaying mock findings instead.`);
+      setFindings(MOCK_FINDINGS);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+  
+  const toggleMute = useCallback((id: string) => {
+    setFindings(prev => 
+      prev.map(f => f.id === id ? { ...f, muted: !f.muted } : f)
+    );
+  }, []);
 
-        setIsLoading(true);
-        setError(null);
-        setCurrentScan(null);
-
-        try {
-            const results = await analyzeConfiguration(content);
-            const newScan: ScanResult = {
-                id: Date.now(),
-                scannedAt: new Date().toLocaleString(),
-                fileName,
-                findings: results,
-            };
-            setCurrentScan(newScan);
-            setHistory(prev => [newScan, ...prev.slice(0, 9)]); // Keep last 10 scans
-        } catch (e: any) {
-            setError(e.message || 'An unknown error occurred during the scan.');
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    const toggleMuteFinding = (findingId: string) => {
-        if (!currentScan) return;
-
-        const updatedFindings = currentScan.findings.map(f =>
-            f.id === findingId ? { ...f, muted: !f.muted } : f
-        );
-
-        const updatedScan = { ...currentScan, findings: updatedFindings };
-        setCurrentScan(updatedScan);
-
-        // Also update history
-        setHistory(prev => prev.map(h => h.id === currentScan.id ? updatedScan : h));
-    };
-
-    return { 
-        scanContent, 
-        currentScan, 
-        setCurrentScan,
-        history, 
-        isLoading, 
-        error, 
-        toggleMuteFinding 
-    };
+  return { findings, isLoading, error, scan, toggleMute };
 };
