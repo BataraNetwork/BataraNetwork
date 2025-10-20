@@ -1,0 +1,6 @@
+apiVersion: v2
+name: bataranetwork
+description: A Helm chart for deploying the Bataranetwork blockchain node.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

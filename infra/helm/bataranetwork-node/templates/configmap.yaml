@@ -1,0 +1,12 @@
+# ConfigMap resource to manage the node's configuration.
+# This allows separating configuration from the container image, making it easier
+# to manage and update settings without rebuilding the image.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bataranetwork.name" . }}
+  labels:
+    {{- include "bataranetwork.labels" . | nindent 4 }}
+data:
+  config.json: |-
+{{ .Values.config.json | indent 4 }}

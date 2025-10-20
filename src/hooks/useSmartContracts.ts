@@ -1,21 +1,5 @@
 import { useState, useCallback } from 'react';
-
-export interface Contract {
-    id: string;
-    name: string;
-    address: string;
-    balance: number;
-    methods: string[];
-}
-
-export interface ContractInteraction {
-    id: number;
-    contractId: string;
-    method: string;
-    params: any[];
-    result: any;
-    timestamp: string;
-}
+import { Contract, ContractInteraction } from '../types';
 
 const MOCK_CONTRACTS: Contract[] = [
     {
@@ -42,14 +26,15 @@ const MOCK_CONTRACTS: Contract[] = [
 ];
 
 let interactionCounter = 1;
+let contractIdCounter = 4;
 
 export const useSmartContracts = () => {
     const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
     const [interactions, setInteractions] = useState<ContractInteraction[]>([]);
 
-    const callMethod = useCallback((contractId: string, method: string, params: any[]) => {
+    const callMethod = useCallback((contractId: string, method: string, params: any[]): ContractInteraction | null => {
         const contract = contracts.find(c => c.id === contractId);
-        if (!contract) return;
+        if (!contract) return null;
 
         // Simulate a result
         let result: any;
@@ -71,7 +56,23 @@ export const useSmartContracts = () => {
         };
 
         setInteractions(prev => [newInteraction, ...prev.slice(0, 9)]);
+        return newInteraction;
     }, [contracts]);
-    
-    return { contracts, interactions, callMethod };
+
+    const deployContract = useCallback((name: string, bytecode: string, initialState: string): Contract => {
+        const newContract: Contract = {
+            id: String(contractIdCounter++),
+            name,
+            // Simulate address generation
+            address: `0xContract...${Math.random().toString(16).slice(2, 8)}`,
+            balance: 0,
+            // Simulate method discovery from bytecode
+            methods: ['constructor()', 'getValue()', 'setValue(uint256)'],
+        };
+        setContracts(prev => [newContract, ...prev]);
+        return newContract;
+    }, []);
+
+
+    return { contracts, interactions, callMethod, deployContract };
 };

@@ -31,6 +31,8 @@ const MOCK_PROPOSALS: Proposal[] = [
     },
 ];
 
+let proposalIdCounter = 43;
+
 export const useGovernance = () => {
     const [proposals, setProposals] = useState<Proposal[]>(MOCK_PROPOSALS);
     const [userVotes, setUserVotes] = useState<Record<string, Vote['option']>>({});
@@ -49,5 +51,19 @@ export const useGovernance = () => {
         setUserVotes(prev => ({ ...prev, [proposalId]: option }));
     }, [userVotes]);
 
-    return { proposals, userVotes, castVote };
+    const submitProposal = useCallback((data: { title: string; description: string; endBlock: number; proposer: string }): Proposal => {
+        const newProposal: Proposal = {
+            id: `BIP-${proposalIdCounter++}`,
+            title: data.title,
+            proposer: data.proposer,
+            status: 'active',
+            description: data.description,
+            votes: { yes: 0, no: 0, abstain: 0 },
+            endBlock: data.endBlock,
+        };
+        setProposals(prev => [newProposal, ...prev]);
+        return newProposal;
+    }, []);
+
+    return { proposals, userVotes, castVote, submitProposal };
 };

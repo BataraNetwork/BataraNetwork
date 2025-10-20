@@ -15,6 +15,7 @@ import { ContractView } from './components/features/contracts/ContractView';
 import { TeamManagementView } from './components/features/team/TeamManagementView';
 import { ApiKeyManagerView } from './components/features/apikeys/ApiKeyManagerView';
 import { AuditTrailView } from './components/features/audit/AuditTrailView';
+import { WalletView } from './components/features/wallet/WalletView';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { AuditEvent, Permission } from './types';
 
@@ -25,6 +26,7 @@ const ALL_TABS: { name: string; permission: Permission }[] = [
   { name: 'Config Generator', permission: 'view:generator' },
   { name: 'Security Scanner', permission: 'view:security' },
   { name: 'CI/CD Pipeline', permission: 'view:pipeline' },
+  { name: 'Wallet', permission: 'view:wallet' },
   { name: 'Staking', permission: 'view:staking' },
   { name: 'Governance', permission: 'view:governance' },
   { name: 'Smart Contracts', permission: 'view:contracts' },
@@ -60,19 +62,21 @@ const AppContent: React.FC = () => {
       case 'Monitoring':
         return <MonitoringDashboard {...nodeStatusHook} {...metricAnalysisHook} />;
       case 'Alerts':
-        return <AlertManager alerts={nodeStatusHook.alerts} logAction={logAction} />;
+        return <AlertManager alerts={nodeStatusHook.alerts} />;
       case 'Logs':
         return <LogViewer />;
       case 'Config Generator':
-        return <ConfigGenerator logAction={logAction} />;
+        return <ConfigGenerator />;
       case 'Security Scanner':
-        return <SecurityScanner logAction={logAction} />;
+        return <SecurityScanner />;
       case 'CI/CD Pipeline':
-        return <PipelineView logAction={logAction} />;
+        return <PipelineView />;
+      case 'Wallet':
+        return <WalletView logAction={logAction} />;
       case 'Staking':
         return <StakingView logAction={logAction} />;
       case 'Governance':
-        return <GovernanceView logAction={logAction} />;
+        return <GovernanceView />;
       case 'Smart Contracts':
         return <ContractView logAction={logAction} />;
       case 'Team Management':

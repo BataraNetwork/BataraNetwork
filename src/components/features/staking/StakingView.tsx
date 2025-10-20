@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStaking } from '../../../hooks/useStaking';
 import { Validator } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
-import { CheckCircleIcon, XCircleIcon, ArrowRightIcon } from '../../ui/icons';
+import { CheckCircleIcon, XCircleIcon } from '../../ui/icons';
 
 const StatCard: React.FC<{ title: string; value: string | number; }> = ({ title, value }) => (
     <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
@@ -11,17 +11,43 @@ const StatCard: React.FC<{ title: string; value: string | number; }> = ({ title,
     </div>
 );
 
-const ValidatorRow: React.FC<{ validator: Validator, onStake: (address: string, amount: number) => void }> = ({ validator, onStake }) => {
-    const [amount, setAmount] = useState('');
+const ValidatorRow: React.FC<{ 
+    validator: Validator, 
+    onStake: (address: string, amount: number) => { success: boolean, message: string },
+    onUnstake: (address: string, amount: number) => { success: boolean, message: string },
+}> = ({ validator, onStake, onUnstake }) => {
+    const [stakeAmount, setStakeAmount] = useState('');
+    const [unstakeAmount, setUnstakeAmount] = useState('');
+    const [stakeError, setStakeError] = useState<string | null>(null);
+    const [unstakeError, setUnstakeError] = useState<string | null>(null);
     const { currentUser } = useAuth();
     const canStake = currentUser.permissions.has('action:stake');
 
     const handleStake = (e: React.FormEvent) => {
         e.preventDefault();
-        const stakeAmount = parseInt(amount, 10);
-        if (!isNaN(stakeAmount) && stakeAmount > 0) {
-            onStake(validator.address, stakeAmount);
-            setAmount('');
+        setStakeError(null);
+        const amount = parseInt(stakeAmount, 10);
+        if (!isNaN(amount) && amount > 0) {
+            const result = onStake(validator.address, amount);
+            if (result.success) {
+                setStakeAmount('');
+            } else {
+                setStakeError(result.message);
+            }
+        }
+    };
+    
+    const handleUnstake = (e: React.FormEvent) => {
+        e.preventDefault();
+        setUnstakeError(null);
+        const amount = parseInt(unstakeAmount, 10);
+        if (!isNaN(amount) && amount > 0) {
+            const result = onUnstake(validator.address, amount);
+            if (!result.success) {
+                setUnstakeError(result.message);
+            } else {
+                setUnstakeAmount('');
+            }
         }
     };
     
@@ -44,34 +70,85 @@ const ValidatorRow: React.FC<{ validator: Validator, onStake: (address: string, 
                     : <XCircleIcon className="h-6 w-6 text-red-500 mx-auto" />}
             </td>
             <td className="p-4">
-                <form onSubmit={handleStake} className="flex items-center gap-2">
-                    <input 
-                        type="number"
-                        value={amount}
-                        onChange={e => setAmount(e.target.value)}
-                        placeholder="Amount (BTR)"
-                        className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
-                        disabled={!canStake}
-                    />
-                    <button type="submit" className="bg-sky-600 rounded p-1.5 text-white hover:bg-sky-500 transition disabled:bg-slate-600 disabled:cursor-not-allowed" disabled={!canStake || !amount}>
-                        <ArrowRightIcon className="h-4 w-4" />
-                    </button>
-                </form>
+                <div className="flex items-start gap-4">
+                    <form onSubmit={handleStake} className="flex flex-col items-start">
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="number"
+                                value={stakeAmount}
+                                onChange={e => {
+                                    setStakeAmount(e.target.value);
+                                    setStakeError(null);
+                                }}
+                                placeholder="Amount"
+                                className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
+                                disabled={!canStake || validator.status === 'inactive'}
+                                title={validator.status === 'inactive' ? 'Cannot stake on an inactive validator' : ''}
+                            />
+                            <button 
+                                type="submit" 
+                                className="bg-sky-600 rounded px-3 py-1.5 text-white text-xs font-semibold hover:bg-sky-500 transition disabled:bg-slate-600 disabled:cursor-not-allowed" 
+                                disabled={!canStake || !stakeAmount || validator.status === 'inactive'}>
+                                Stake
+                            </button>
+                        </div>
+                        {stakeError && <p className="text-xs text-red-400 mt-1">{stakeError}</p>}
+                    </form>
+                    <div className="h-10 w-px bg-slate-600"></div>
+                    <form onSubmit={handleUnstake} className="flex flex-col items-start">
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="number"
+                                value={unstakeAmount}
+                                onChange={e => {
+                                    setUnstakeAmount(e.target.value);
+                                    setUnstakeError(null);
+                                }}
+                                placeholder="Amount"
+                                className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
+                                disabled={!canStake || validator.status === 'inactive'}
+                                title={validator.status === 'inactive' ? 'Cannot unstake from an inactive validator' : ''}
+                            />
+                            <button 
+                                type="submit" 
+                                className="bg-red-600 rounded px-3 py-1.5 text-white text-xs font-semibold hover:bg-red-500 transition disabled:bg-slate-600 disabled:cursor-not-allowed" 
+                                disabled={!canStake || !unstakeAmount || validator.status === 'inactive'}>
+                                Unstake
+                            </button>
+                        </div>
+                        {unstakeError && <p className="text-xs text-red-400 mt-1">{unstakeError}</p>}
+                    </form>
+                </div>
             </td>
         </tr>
     );
 };
 
 export const StakingView: React.FC<{ logAction: (action: string, details: Record<string, any>) => void }> = ({ logAction }) => {
-    const { validators, totalStaked, stakedAmount, stakeTokens } = useStaking();
+    const { validators, totalStaked, stakedAmount, stakeTokens, unstakeTokens } = useStaking();
     
     const handleStakeTokens = (address: string, amount: number) => {
         const validator = validators.find(v => v.address === address);
-        stakeTokens(address, amount);
-        logAction('staking.stake', { 
-            validator: validator?.name || address,
-            amount: amount 
-        });
+        const result = stakeTokens(address, amount);
+        if (result.success) {
+            logAction('staking.stake', { 
+                validator: validator?.name || address,
+                amount: amount 
+            });
+        }
+        return result;
+    };
+
+    const handleUnstakeTokens = (address: string, amount: number) => {
+        const validator = validators.find(v => v.address === address);
+        const result = unstakeTokens(address, amount);
+        if (result.success) {
+            logAction('staking.unstake', { 
+                validator: validator?.name || address,
+                amount: amount 
+            });
+        }
+        return result;
     };
 
     return (
@@ -96,11 +173,11 @@ export const StakingView: React.FC<{ logAction: (action: string, details: Record
                             <th className="p-4 font-semibold text-right">Commission</th>
                             <th className="p-4 font-semibold text-right">Uptime</th>
                             <th className="p-4 font-semibold text-center">Status</th>
-                            <th className="p-4 font-semibold">Stake with Validator</th>
+                            <th className="p-4 font-semibold">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {validators.map(v => <ValidatorRow key={v.address} validator={v} onStake={handleStakeTokens} />)}
+                        {validators.map(v => <ValidatorRow key={v.address} validator={v} onStake={handleStakeTokens} onUnstake={handleUnstakeTokens} />)}
                     </tbody>
                 </table>
              </div>

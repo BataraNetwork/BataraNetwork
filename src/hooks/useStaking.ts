@@ -18,22 +18,51 @@ export const useStaking = () => {
 
     const totalStaked = validators.reduce((acc, v) => acc + v.stake, 0);
 
-    const stakeTokens = useCallback((validatorAddress: string, amount: number) => {
+    const stakeTokens = useCallback((validatorAddress: string, amount: number): { success: boolean; message: string } => {
+        const validator = validators.find(v => v.address === validatorAddress);
+
+        if (!validator) {
+            return { success: false, message: 'Validator not found.' };
+        }
+
+        if (validator.status === 'inactive') {
+            return { success: false, message: 'Cannot stake on an inactive validator.' };
+        }
+
         setValidators(prev => prev.map(v => 
             v.address === validatorAddress ? { ...v, stake: v.stake + amount } : v
         ));
         personalStake += amount;
         setStakedAmount(personalStake);
-    }, []);
+        return { success: true, message: 'Stake successful.' };
+    }, [validators]);
     
-    const unstakeTokens = useCallback((validatorAddress: string, amount: number) => {
-        // Basic simulation, doesn't handle staking less than amount
+    const unstakeTokens = useCallback((validatorAddress: string, amount: number): { success: boolean; message: string } => {
+        const validator = validators.find(v => v.address === validatorAddress);
+
+        if (!validator) {
+            return { success: false, message: 'Validator not found.' };
+        }
+
+        if (validator.status === 'inactive') {
+            return { success: false, message: 'Cannot unstake from inactive validator.' };
+        }
+        
+        if (amount > stakedAmount) {
+            return { success: false, message: 'Amount exceeds your personal stake.' };
+        }
+        
+        if (amount > validator.stake) {
+            return { success: false, message: "Amount exceeds validator's total stake." };
+        }
+        
         setValidators(prev => prev.map(v => 
-            v.address === validatorAddress ? { ...v, stake: v.stake - amount } : v
+            v.address === validatorAddress ? { ...v, stake: Math.max(0, v.stake - amount) } : v
         ));
-        personalStake -= amount;
+        personalStake = Math.max(0, personalStake - amount);
         setStakedAmount(personalStake);
-    }, []);
+        return { success: true, message: 'Unstake successful.' };
+    }, [validators, stakedAmount]);
 
     return { validators, totalStaked, stakedAmount, stakeTokens, unstakeTokens };
 };

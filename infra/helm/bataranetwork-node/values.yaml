@@ -1,0 +1,75 @@
+replicaCount: 1
+
+image:
+  repository: bataranetwork-org/bataranetwork
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  httpPort: 3000
+  grpcPort: 50051
+
+config:
+  # -- Raw JSON configuration for the node.
+  # It will be mounted as a file at /app/config/config.json
+  json: |-
+    {
+      "env": "production",
+      "http_port": 3000,
+      "grpc_port": 50051,
+      "metrics_port": 9100
+    }
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: ""
+
+resources:
+  # We recommend not specifying default resources and leaving this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do specify resources, uncomment the following lines.
+  # limits:
+  #   cpu: 500m
+  #   memory: 1Gi
+  # requests:
+  #   cpu: 250m
+  #   memory: 512Mi
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # kubernetes.io/ingress.class: nginx
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: node.bataranetwork.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: bataranetwork-tls
+  #    hosts:
+  #      - node.bataranetwork.local
+
+networkPolicy:
+  enabled: true
+
+# Probes configuration
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3

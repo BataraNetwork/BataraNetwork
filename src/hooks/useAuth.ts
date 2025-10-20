@@ -2,23 +2,23 @@ import React, { useState, useContext, createContext, useMemo } from 'react';
 import { User, Permission } from '../types';
 
 const DEVOPS_PERMISSIONS: Permission[] = [
-    'view:monitoring', 'view:alerts', 'view:logs', 'view:generator', 'view:security', 'view:pipeline', 'view:governance', 'view:staking', 'view:contracts', 'view:team', 'view:audit_trail',
-    'action:generate', 'action:scan', 'action:acknowledge_alert', 'action:trigger_pipeline', 'action:approve_pipeline', 'action:rollback_pipeline', 'action:stake', 'action:call_contract',
+    'view:monitoring', 'view:alerts', 'view:logs', 'view:generator', 'view:security', 'view:pipeline', 'view:governance', 'view:staking', 'view:contracts', 'view:team', 'view:audit_trail', 'view:wallet',
+    'action:generate', 'action:scan', 'action:acknowledge_alert', 'action:trigger_pipeline', 'action:approve_pipeline', 'action:rollback_pipeline', 'action:stake', 'action:call_contract', 'action:deploy_contract', 'action:send_btr',
 ];
 
 const DEV_PERMISSIONS: Permission[] = [
-    'view:monitoring', 'view:alerts', 'view:logs', 'view:generator', 'view:pipeline', 'view:contracts',
-    'action:generate', 'action:trigger_pipeline', 'action:call_contract'
+    'view:monitoring', 'view:alerts', 'view:logs', 'view:generator', 'view:pipeline', 'view:contracts', 'view:wallet',
+    'action:generate', 'action:trigger_pipeline', 'action:call_contract', 'action:send_btr',
 ];
 
 const AUDITOR_PERMISSIONS: Permission[] = [
-    'view:monitoring', 'view:alerts', 'view:logs', 'view:security', 'view:pipeline', 'view:governance', 'view:staking', 'view:contracts', 'view:team', 'view:audit_trail',
+    'view:monitoring', 'view:alerts', 'view:logs', 'view:security', 'view:pipeline', 'view:governance', 'view:staking', 'view:contracts', 'view:team', 'view:audit_trail', 'view:wallet',
     'action:scan'
 ];
 
 const ADMIN_PERMISSIONS: Permission[] = [
-    'view:monitoring', 'view:alerts', 'view:logs', 'view:generator', 'view:security', 'view:pipeline', 'view:governance', 'view:staking', 'view:contracts', 'view:team', 'view:api_keys', 'view:audit_trail',
-    'action:generate', 'action:scan', 'action:acknowledge_alert', 'action:trigger_pipeline', 'action:approve_pipeline', 'action:rollback_pipeline', 'action:vote', 'action:propose', 'action:stake', 'action:call_contract', 'action:manage_api_keys',
+    'view:monitoring', 'view:alerts', 'view:logs', 'view:generator', 'view:security', 'view:pipeline', 'view:governance', 'view:staking', 'view:contracts', 'view:team', 'view:api_keys', 'view:audit_trail', 'view:wallet',
+    'action:generate', 'action:scan', 'action:acknowledge_alert', 'action:trigger_pipeline', 'action:approve_pipeline', 'action:rollback_pipeline', 'action:vote', 'action:propose', 'action:stake', 'action:call_contract', 'action:deploy_contract', 'action:manage_api_keys', 'action:send_btr',
     'admin:manage_team'
 ];
 

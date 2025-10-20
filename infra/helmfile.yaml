@@ -9,15 +9,15 @@ releases:
   # Example release for the AI Agents
   - name: batara-agents
     namespace: bataranetwork
-    chart: ./helm/batara-agents
+    chart: ./infra/helm/batara-agents
     values:
-      - ./helm/batara-agents/values.yaml
+      - ./infra/helm/batara-agents/values.yaml
       # You can override values for different environments here
       # - values.yaml.gotmpl
 
-  # Placeholder for the main Bataranetwork node release
+  # Main Bataranetwork node release
   - name: bataranetwork-node
     namespace: bataranetwork
-    chart: ./helm/bataranetwork-node # This chart needs to be created
+    chart: ./infra/helm/bataranetwork-node
     values:
       - replicaCount: 3
