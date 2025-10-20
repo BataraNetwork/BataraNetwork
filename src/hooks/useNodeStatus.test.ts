@@ -1,100 +1,97 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useNodeStatus } from './useNodeStatus';
-// FIX: Import Jest globals to resolve type errors.
+import { nodeService } from '../services/nodeService';
 import { describe, beforeEach, afterEach, it, expect, jest } from '@jest/globals';
+
+// Mock the nodeService
+jest.mock('../services/nodeService', () => ({
+  nodeService: {
+    getStatus: jest.fn(),
+  },
+}));
+
+const mockNodeService = nodeService as jest.Mocked<typeof nodeService>;
 
 describe('useNodeStatus', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    mockNodeService.getStatus.mockClear();
   });
 
   afterEach(() => {
     jest.useRealTimers();
-    jest.restoreAllMocks(); // Restore all mocks after each test
   });
 
-  it('should initialize with a default active node', () => {
-    const { result } = renderHook(() => useNodeStatus());
-
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.status).toBeDefined();
-    expect(result.current.activeNodeId).toBe('node-us-east-1');
-    expect(result.current.availableNodes.length).toBe(3);
-  });
-
-  it('should update node status after an interval', () => {
-    const { result } = renderHook(() => useNodeStatus());
-    const initialBlockHeight = result.current.status.latestBlockHeight;
-
-    act(() => {
-      jest.advanceTimersByTime(2000); // Advance time by one interval
-    });
-
-    expect(result.current.status.latestBlockHeight).toBe(initialBlockHeight + 1);
-    expect(result.current.history.length).toBe(1);
-  });
-
-  it('should generate and clear alerts based on metric thresholds', () => {
-    const { result } = renderHook(() => useNodeStatus());
-
-    // --- Part 1: Generate Alert ---
-    let randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.9); // Force metric to increase
-
-    act(() => {
-        // Run enough intervals to push CPU over the 85% threshold
-        for (let i = 0; i < 20; i++) {
-            jest.advanceTimersByTime(2000);
-        }
-    });
-
-    let cpuAlert = result.current.alerts.find(a => a.id.includes('-cpu') && a.status === 'active');
-    expect(cpuAlert).toBeDefined();
-    expect(cpuAlert?.severity).toBe('critical');
-    expect(result.current.status.cpuUsage).toBeGreaterThan(85);
-
-    // --- Part 2: Clear Alert ---
-    randomSpy.mockReturnValue(0.1); // Force metric to decrease
-
-    act(() => {
-        // Run enough intervals to push CPU below the threshold
-        for (let i = 0; i < 20; i++) {
-            jest.advanceTimersByTime(2000);
-        }
+  it('should be in a loading state initially and then fetch status', async () => {
+    mockNodeService.getStatus.mockResolvedValue({
+      latestBlockHeight: 100,
+      pendingTransactions: 5,
+      validatorCount: 1,
+      totalStaked: 1000000,
+      activeProposals: 0,
+      uptime: 120,
+      memoryUsage: 30.5,
+      cpuUsage: 15.2,
     });
     
-    // The alert is now gone from the incoming alerts
-    cpuAlert = result.current.alerts.find(a => a.id.includes('-cpu') && a.status === 'active');
-    expect(cpuAlert).toBeUndefined(); 
-    expect(result.current.status.cpuUsage).toBeLessThanOrEqual(85);
+    const { result } = renderHook(() => useNodeStatus());
+
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.status).toBeUndefined();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.status).toBeDefined();
+    expect(result.current.status?.latestBlockHeight).toBe(100);
+    expect(result.current.status?.cpuUsage).toBe(15.2);
+  });
+
+  it('should poll for new status updates at intervals', async () => {
+    mockNodeService.getStatus
+      .mockResolvedValueOnce({ latestBlockHeight: 100, pendingTransactions: 5, validatorCount:1, totalStaked:0, activeProposals:0, uptime:1, cpuUsage:10, memoryUsage:20 })
+      .mockResolvedValueOnce({ latestBlockHeight: 101, pendingTransactions: 8, validatorCount:1, totalStaked:0, activeProposals:0, uptime:4, cpuUsage:12, memoryUsage:22 });
+
+    const { result } = renderHook(() => useNodeStatus());
+    
+    await waitFor(() => expect(result.current.status?.latestBlockHeight).toBe(100));
+    
+    // Advance timers to trigger the next poll
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+
+    await waitFor(() => expect(result.current.status?.latestBlockHeight).toBe(101));
+    expect(result.current.status?.pendingTransactions).toBe(8);
+    expect(mockNodeService.getStatus).toHaveBeenCalledTimes(2);
   });
   
-  it('should change the active node and update its status', () => {
-    const { result } = renderHook(() => useNodeStatus());
-    const initialNodeStatus = result.current.nodes['node-eu-west-1'];
-
-    act(() => {
-      result.current.setActiveNodeId('node-eu-west-1');
-    });
-
-    expect(result.current.activeNodeId).toBe('node-eu-west-1');
+  it('should set an error state if the API call fails', async () => {
+    mockNodeService.getStatus.mockRejectedValue(new Error('Network Error'));
     
-    act(() => {
-      jest.advanceTimersByTime(2000);
-    });
-
-    // Verify the new active node's status has updated
-    expect(result.current.status.latestBlockHeight).toBe(initialNodeStatus.latestBlockHeight + 1);
-  });
-
-  it('should maintain a history of the last 30 data points', () => {
     const { result } = renderHook(() => useNodeStatus());
 
-    act(() => {
-      for (let i = 0; i < 40; i++) {
-        jest.advanceTimersByTime(2000);
-      }
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.error).toContain('Failed to connect');
+    expect(result.current.status).toBeUndefined();
+  });
+  
+  it('should update the history with new data points', async () => {
+     mockNodeService.getStatus.mockResolvedValue({ latestBlockHeight: 100, pendingTransactions: 5, validatorCount:1, totalStaked:0, activeProposals:0, uptime:1, cpuUsage:10, memoryUsage:20 });
+
+    const { result } = renderHook(() => useNodeStatus());
+
+    await waitFor(() => expect(result.current.history.length).toBe(1));
+    expect(result.current.history[0].cpuUsage).toBe(10);
+
+    // Update the mock for the next call
+    mockNodeService.getStatus.mockResolvedValue({ latestBlockHeight: 101, pendingTransactions: 8, validatorCount:1, totalStaked:0, activeProposals:0, uptime:4, cpuUsage:12, memoryUsage:22 });
+
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
     });
-    // The history is capped at 29 slices + 1 new entry = 30
-    expect(result.current.history.length).toBe(30);
+
+    await waitFor(() => expect(result.current.history.length).toBe(2));
+    expect(result.current.history[1].cpuUsage).toBe(12);
   });
 });

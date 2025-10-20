@@ -1,82 +1,76 @@
 import { useState, useCallback, useEffect } from 'react';
 import { WalletTransaction, User } from '../types';
+import { nodeService } from '../services/nodeService';
 
 interface WalletState {
-    address: string;
     balance: number;
+    nonce: number;
     transactions: WalletTransaction[];
 }
 
-const initialWalletStates: Record<string, WalletState> = {
-    '1': { // Alice (DevOps)
-        address: '0xDevOps...a1b2c3',
-        balance: 5000,
-        transactions: [
-            { id: 'tx1', type: 'receive', from: '0xNetwork...d4e5f6', to: '0xDevOps...a1b2c3', amount: 1000, status: 'completed', timestamp: new Date(Date.now() - 86400000).toLocaleString() }
-        ],
-    },
-    '2': { // Bob (Developer)
-        address: '0xDev...d4e5f6',
-        balance: 1200,
-        transactions: [],
-    },
-    '3': { // Charlie (Auditor)
-        address: '0xAudit...g7h8i9',
-        balance: 500,
-        transactions: [],
-    },
-    '4': { // Dana (Admin)
-        address: '0xAdmin...jKlM0p',
-        balance: 100000,
-        transactions: [],
-    }
+// Transaction history is now the only simulated part.
+const initialTransactionHistory: Record<string, WalletTransaction[]> = {
+    '1': [{ id: 'tx1', type: 'receive', from: '0xNetwork...d4e5f6', to: '0xDevOps...a1b2c3', amount: 1000, status: 'completed', timestamp: new Date(Date.now() - 86400000).toLocaleString() }],
+    '2': [],
+    '3': [],
+    '4': [],
 };
 
-
 export const useWallet = (currentUser: User) => {
-    const [walletState, setWalletState] = useState<WalletState>(initialWalletStates[currentUser.id]);
+    const [balance, setBalance] = useState(0);
+    const [nonce, setNonce] = useState(0);
+    const [transactions, setTransactions] = useState<WalletTransaction[]>(initialTransactionHistory[currentUser.id] || []);
     
-    useEffect(() => {
-        // Switch wallet state when the user changes
-        setWalletState(initialWalletStates[currentUser.id]);
-    }, [currentUser.id]);
+    // Fetch live balance and nonce from the backend node
+    const fetchAccountState = useCallback(async () => {
+        try {
+            const account = await nodeService.getAccount(currentUser.publicKey);
+            setBalance(account.balance);
+            setNonce(account.nonce);
+        } catch (error) {
+            console.error(`Failed to fetch account state for ${currentUser.name}:`, error);
+            // In case of error, reset to 0 to avoid showing stale data
+            setBalance(0);
+            setNonce(0);
+        }
+    }, [currentUser.publicKey, currentUser.name]);
 
-    const sendBtr = useCallback((to: string, amount: number): { success: boolean, message: string } => {
-        if (amount <= 0) {
-            return { success: false, message: 'Amount must be positive.' };
-        }
-        if (walletState.balance < amount) {
-            return { success: false, message: 'Insufficient balance.' };
-        }
+    useEffect(() => {
+        fetchAccountState();
+        // Also switch transaction history when user changes
+        setTransactions(initialTransactionHistory[currentUser.id] || []);
         
+        const interval = setInterval(fetchAccountState, 5000); // Poll for balance updates
+        return () => clearInterval(interval);
+    }, [currentUser.id, fetchAccountState]);
+
+    // SendBtr is now just a simulation of adding to the local history,
+    // as the actual balance update will be fetched from the node after the transaction is processed.
+    const addSentTransactionToHistory = useCallback((to: string, amount: number) => {
         const newTx: WalletTransaction = {
             id: crypto.randomUUID(),
             type: 'send',
-            from: walletState.address,
+            from: currentUser.publicKey,
             to,
             amount,
-            status: 'completed',
+            status: 'pending', // Assume pending until it's confirmed in a block
             timestamp: new Date().toLocaleString(),
         };
         
-        const newState: WalletState = {
-            ...walletState,
-            balance: walletState.balance - amount,
-            transactions: [newTx, ...walletState.transactions],
-        };
-        
-        // Update the central store and the local state
-        initialWalletStates[currentUser.id] = newState;
-        setWalletState(newState);
+        // Update the central store and the local state for transaction history
+        if (!initialTransactionHistory[currentUser.id]) {
+            initialTransactionHistory[currentUser.id] = [];
+        }
+        initialTransactionHistory[currentUser.id].unshift(newTx);
+        setTransactions(prev => [newTx, ...prev]);
 
-        return { success: true, message: 'Transaction successful!' };
-
-    }, [walletState, currentUser.id]);
+    }, [currentUser.id, currentUser.publicKey]);
 
     return { 
-        balance: walletState.balance, 
-        address: walletState.address,
-        transactions: walletState.transactions,
-        sendBtr
+        balance, 
+        nonce,
+        address: currentUser.publicKey,
+        transactions,
+        addSentTransactionToHistory,
     };
 };

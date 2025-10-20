@@ -13,6 +13,8 @@ const ContractCard: React.FC<{
   const [paramValues, setParamValues] = useState<string[]>([]);
   const { currentUser } = useAuth();
   const canCall = currentUser.permissions.has('action:call_contract');
+  const [isCalling, setIsCalling] = useState(false);
+
 
   const parsedParams = useMemo(() => {
     const match = selectedMethod.match(/\(([^)]*)\)/);
@@ -24,7 +26,7 @@ const ContractCard: React.FC<{
 
   useEffect(() => {
     setParamValues(new Array(parsedParams.length).fill(''));
-  }, [parsedParams]);
+  }, [parsedParams, selectedMethod]);
 
   const handleParamChange = (index: number, value: string) => {
     const newValues = [...paramValues];
@@ -32,8 +34,10 @@ const ContractCard: React.FC<{
     setParamValues(newValues);
   };
 
-  const handleCall = () => {
-    onCallMethod(contract.id, selectedMethod, paramValues);
+  const handleCall = async () => {
+    setIsCalling(true);
+    await onCallMethod(contract.id, selectedMethod, paramValues);
+    setIsCalling(false);
   };
   
   return (
@@ -43,7 +47,7 @@ const ContractCard: React.FC<{
       <div className="flex items-center gap-4 mb-4">
         <div className="text-sm">
           <p className="text-slate-400">Balance</p>
-          <p className="font-bold text-white">{contract.balance.toLocaleString()} BTR</p>
+          <p className="font-bold text-white">{contract.balance.toLocaleString()} BTR (Simulated)</p>
         </div>
       </div>
       
@@ -59,7 +63,7 @@ const ContractCard: React.FC<{
                         onChange={(e) => handleParamChange(index, e.target.value)}
                         placeholder={`Enter ${paramType}`}
                         className="w-full bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"
-                        disabled={!canCall}
+                        disabled={!canCall || isCalling}
                     />
                 </div>
             ))}
@@ -76,10 +80,10 @@ const ContractCard: React.FC<{
             </select>
             <button
             onClick={handleCall}
-            disabled={!canCall}
+            disabled={!canCall || isCalling}
             className="bg-sky-600 text-white font-semibold rounded-md px-4 py-2 hover:bg-sky-500 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed"
             >
-            Call
+            {isCalling ? '...' : 'Call'}
             </button>
         </div>
       </div>
@@ -96,11 +100,14 @@ const DeployContractCard: React.FC<{
     const [initialState, setInitialState] = useState('');
     const { hasPermission } = useAuth();
     const canDeploy = hasPermission('action:deploy_contract');
+    const [isDeploying, setIsDeploying] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (canDeploy && name && bytecode) {
-            onDeploy(name, bytecode, initialState);
+            setIsDeploying(true);
+            await onDeploy(name, bytecode, initialState);
+            setIsDeploying(false);
             setName('');
             setBytecode('');
             setInitialState('');
@@ -120,28 +127,28 @@ const DeployContractCard: React.FC<{
                     onChange={e => setName(e.target.value)}
                     placeholder="Contract Name (e.g., MyNFT)"
                     className="w-full bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    disabled={!canDeploy}
+                    disabled={!canDeploy || isDeploying}
                 />
                 <textarea
                     value={bytecode}
                     onChange={e => setBytecode(e.target.value)}
-                    placeholder="Paste WASM bytecode..."
+                    placeholder="Paste WASM bytecode (simulated)..."
                     className="w-full flex-grow bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    disabled={!canDeploy}
+                    disabled={!canDeploy || isDeploying}
                 />
                  <textarea
                     value={initialState}
                     onChange={e => setInitialState(e.target.value)}
                     placeholder='Initial State (JSON format), e.g., {"owner": "0x..."}'
                     className="w-full bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-500 h-20"
-                    disabled={!canDeploy}
+                    disabled={!canDeploy || isDeploying}
                 />
                 <button
                     type="submit"
-                    disabled={!canDeploy || !name || !bytecode}
+                    disabled={!canDeploy || !name || !bytecode || isDeploying}
                     className="w-full bg-sky-600 text-white font-semibold rounded-md py-2.5 hover:bg-sky-500 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed mt-auto"
                 >
-                    Deploy
+                    {isDeploying ? 'Deploying...' : 'Deploy'}
                 </button>
                  {!canDeploy && <p className="text-xs text-center text-yellow-400">Your role cannot deploy contracts.</p>}
             </form>
@@ -150,27 +157,29 @@ const DeployContractCard: React.FC<{
 };
 
 export const ContractView: React.FC<{ logAction: (action: string, details: Record<string, any>) => void }> = ({ logAction }) => {
-    const { contracts, interactions, callMethod, deployContract } = useSmartContracts();
+    const { contracts, interactions, callMethod, deployContract, isLoading } = useSmartContracts();
 
-    const handleCallMethod = (contractId: string, method: string, params: any[]) => {
-        const interaction = callMethod(contractId, method, params);
+    const handleCallMethod = async (contractId: string, method: string, params: any[]) => {
+        const interaction = await callMethod(contractId, method, params);
         if (interaction) {
             const contract = contracts.find(c => c.id === contractId);
             logAction('contract.call', {
                 contractName: contract?.name || 'Unknown',
                 method: method,
                 params: params,
+                result: interaction.result,
             });
         }
     };
     
-    const handleDeployContract = (name: string, bytecode: string, initialState: string) => {
-        const newContract = deployContract(name, bytecode, initialState);
-        logAction('contract.deploy', {
-            contractId: newContract.id,
-            contractName: newContract.name,
-            address: newContract.address,
-        });
+    const handleDeployContract = async (name: string, bytecode: string, initialState: string) => {
+        const transaction = await deployContract(name, bytecode, initialState);
+        if (transaction) {
+            logAction('contract.deploy', {
+                contractName: name,
+                transactionId: transaction.id,
+            });
+        }
     };
     
     return (
@@ -179,7 +188,9 @@ export const ContractView: React.FC<{ logAction: (action: string, details: Recor
                 <h2 className="text-3xl font-bold text-white flex items-center gap-2"><CodeBracketIcon className="h-8 w-8" /> Smart Contract Interaction</h2>
                 <p className="text-slate-400">View deployed contracts and interact with their functions.</p>
             </div>
-
+            
+            {isLoading && <div className="text-center p-8">Loading contracts from the blockchain...</div>}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <DeployContractCard onDeploy={handleDeployContract} />
                 {contracts.map(contract => (
@@ -201,7 +212,7 @@ export const ContractView: React.FC<{ logAction: (action: string, details: Recor
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <CodeBlock title="Parameters" content={JSON.stringify(interaction.params, null, 2)} />
-                                    <CodeBlock title="Result" content={JSON.stringify(interaction.result, null, 2)} />
+                                    <CodeBlock title="Result (Broadcast Confirmation)" content={JSON.stringify(interaction.result, null, 2)} />
                                 </div>
                            </div>
                         ))}

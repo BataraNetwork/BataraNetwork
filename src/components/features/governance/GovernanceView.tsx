@@ -6,10 +6,18 @@ import { CheckCircleIcon, XCircleIcon, SparklesIcon, GavelIcon } from '../../ui/
 
 const getStatusStyles = (status: Proposal['status']) => {
     switch (status) {
-        case 'active': return 'bg-sky-500/20 text-sky-400';
-        case 'passed': return 'bg-green-500/20 text-green-400';
-        case 'failed': return 'bg-red-500/20 text-red-400';
-        case 'executed': return 'bg-purple-500/20 text-purple-400';
+        case 'active':
+        case 'ACTIVE':
+             return 'bg-sky-500/20 text-sky-400';
+        case 'passed':
+        case 'PASSED':
+            return 'bg-green-500/20 text-green-400';
+        case 'failed':
+        case 'FAILED':
+            return 'bg-red-500/20 text-red-400';
+        case 'executed':
+        case 'EXECUTED':
+            return 'bg-purple-500/20 text-purple-400';
         default: return 'bg-slate-700/50 text-slate-400';
     }
 };
@@ -40,11 +48,11 @@ const ProposalCard: React.FC<{
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
             <div className="flex justify-between items-start mb-2">
                 <div>
-                    <h3 className="text-lg font-bold text-white">{proposal.id}: {proposal.title}</h3>
-                    <p className="text-xs text-slate-500">Proposed by: <span className="font-mono">{proposal.proposer}</span></p>
+                    <h3 className="text-lg font-bold text-white">{proposal.id.substring(0, 10)}...: {proposal.title}</h3>
+                    <p className="text-xs text-slate-500">Proposed by: <span className="font-mono truncate">{proposal.proposer}</span></p>
                 </div>
                 <div className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusStyles(proposal.status)}`}>
-                    {proposal.status.toUpperCase()}
+                    {String(proposal.status).toUpperCase()}
                 </div>
             </div>
             <p className="text-sm text-slate-400 mb-4">{proposal.description}</p>
@@ -58,7 +66,7 @@ const ProposalCard: React.FC<{
                 </div>
             </div>
 
-            {proposal.status === 'active' && (
+            {String(proposal.status).toUpperCase() === 'ACTIVE' && (
                 <div>
                     {userVote ? (
                         <p className="text-center text-sm text-slate-400">You voted: <span className="font-bold">{userVote.toUpperCase()}</span></p>
@@ -83,14 +91,17 @@ const NewProposalModal: React.FC<{
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [endBlock, setEndBlock] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!isOpen) return null;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const endBlockNum = parseInt(endBlock, 10);
         if (title && description && !isNaN(endBlockNum)) {
-            onSubmit({ title, description, endBlock: endBlockNum });
+            setIsSubmitting(true);
+            await onSubmit({ title, description, endBlock: endBlockNum });
+            setIsSubmitting(false);
         }
     };
 
@@ -116,8 +127,10 @@ const NewProposalModal: React.FC<{
                         </div>
                     </div>
                     <div className="p-4 border-t border-slate-700 bg-slate-800/50 rounded-b-lg flex justify-end gap-4">
-                        <button type="button" onClick={onClose} className="bg-slate-600 text-white font-semibold rounded-md px-4 py-2 hover:bg-slate-500 transition">Cancel</button>
-                        <button type="submit" className="bg-sky-600 text-white font-semibold rounded-md px-4 py-2 hover:bg-sky-500 transition">Submit Proposal</button>
+                        <button type="button" onClick={onClose} className="bg-slate-600 text-white font-semibold rounded-md px-4 py-2 hover:bg-slate-500 transition" disabled={isSubmitting}>Cancel</button>
+                        <button type="submit" className="bg-sky-600 text-white font-semibold rounded-md px-4 py-2 hover:bg-sky-500 transition disabled:opacity-50" disabled={isSubmitting}>
+                            {isSubmitting ? 'Submitting...' : 'Submit Proposal'}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -126,19 +139,21 @@ const NewProposalModal: React.FC<{
 };
 
 export const GovernanceView: React.FC<{ logAction: (action: string, details: Record<string, any>) => void }> = ({ logAction }) => {
-    const { proposals, userVotes, castVote, submitProposal } = useGovernance();
+    const { proposals, userVotes, castVote, submitProposal, isLoading } = useGovernance();
     const { currentUser, hasPermission } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
     
     const canVote = hasPermission('action:vote');
     const canPropose = hasPermission('action:propose');
 
-    const handlePropose = (data: { title: string, description: string, endBlock: number }) => {
-        const newProposal = submitProposal({ ...data, proposer: currentUser.name });
-        logAction('governance.propose', {
-            proposalId: newProposal.id,
-            title: newProposal.title
-        });
+    const handlePropose = async (data: { title: string, description: string, endBlock: number }) => {
+        const newProposal = await submitProposal({ ...data, proposer: currentUser.publicKey });
+        if (newProposal) {
+            logAction('governance.propose', {
+                proposalId: newProposal.id,
+                title: newProposal.title
+            });
+        }
         setIsModalOpen(false);
     };
 
@@ -159,11 +174,13 @@ export const GovernanceView: React.FC<{ logAction: (action: string, details: Rec
                 </button>
             </div>
             
-            <div className="space-y-6">
-                {proposals.map(p => (
-                    <ProposalCard key={p.id} proposal={p} userVote={userVotes[p.id]} onVote={castVote} canVote={canVote} />
-                ))}
-            </div>
+            {isLoading && proposals.length === 0 ? <div className="text-center p-8 text-slate-400">Loading proposals from the blockchain...</div> :
+                <div className="space-y-6">
+                    {proposals.map(p => (
+                        <ProposalCard key={p.id} proposal={p} userVote={userVotes[p.id]} onVote={castVote} canVote={canVote} />
+                    ))}
+                </div>
+            }
         </div>
     );
 };

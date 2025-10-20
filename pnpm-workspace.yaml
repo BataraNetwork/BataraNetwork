@@ -1,6 +1,11 @@
 packages:
+  # The root dashboard app
   - '.'
+  # The serverless functions
   - 'api'
+  # All packages under the 'core' directory (e.g., node, cli)
   - 'core/*'
+  # All packages under the 'explorer' directory (e.g., frontend, backend)
   - 'explorer/*'
+  # The JS SDK
   - 'sdk/js'

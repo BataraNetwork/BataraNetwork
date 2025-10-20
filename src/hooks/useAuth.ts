@@ -1,5 +1,6 @@
 import React, { useState, useContext, createContext, useMemo } from 'react';
 import { User, Permission } from '../types';
+import { generateKeys } from '../utils/crypto';
 
 const DEVOPS_PERMISSIONS: Permission[] = [
     'view:monitoring', 'view:alerts', 'view:logs', 'view:generator', 'view:security', 'view:pipeline', 'view:governance', 'view:staking', 'view:contracts', 'view:team', 'view:audit_trail', 'view:wallet',
@@ -22,12 +23,31 @@ const ADMIN_PERMISSIONS: Permission[] = [
     'admin:manage_team'
 ];
 
-const USERS: User[] = [
-    { id: '1', name: 'Alice (DevOps)', role: 'DevOps Engineer', avatar: '👩‍💻', permissions: new Set(DEVOPS_PERMISSIONS) },
-    { id: '2', name: 'Bob (Developer)', role: 'Developer', avatar: '👨‍💻', permissions: new Set(DEV_PERMISSIONS) },
-    { id: '3', name: 'Charlie (Auditor)', role: 'Auditor', avatar: '🕵️‍♀️', permissions: new Set(AUDITOR_PERMISSIONS) },
-    { id: '4', name: 'Dana (Admin)', role: 'Administrator', avatar: '👑', permissions: new Set(ADMIN_PERMISSIONS) },
-];
+
+const createUsersWithKeys = (): User[] => {
+    // FIX: Explicitly type the 'usersData' array to ensure the 'role' property
+    // is correctly inferred as a literal type, matching the 'User' interface.
+    const usersData: {
+        id: string;
+        name: string;
+        role: 'DevOps Engineer' | 'Developer' | 'Auditor' | 'Administrator';
+        avatar: string;
+        permissions: Set<Permission>;
+    }[] = [
+        { id: '1', name: 'Alice (DevOps)', role: 'DevOps Engineer', avatar: '👩‍💻', permissions: new Set(DEVOPS_PERMISSIONS) },
+        { id: '2', name: 'Bob (Developer)', role: 'Developer', avatar: '👨‍💻', permissions: new Set(DEV_PERMISSIONS) },
+        { id: '3', name: 'Charlie (Auditor)', role: 'Auditor', avatar: '🕵️‍♀️', permissions: new Set(AUDITOR_PERMISSIONS) },
+        { id: '4', name: 'Dana (Admin)', role: 'Administrator', avatar: '👑', permissions: new Set(ADMIN_PERMISSIONS) },
+    ];
+    
+    return usersData.map(user => {
+        const { publicKey, privateKey } = generateKeys();
+        return { ...user, publicKey, privateKey };
+    });
+};
+
+const USERS = createUsersWithKeys();
+
 
 interface AuthContextType {
     users: User[];

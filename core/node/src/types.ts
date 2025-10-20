@@ -8,6 +8,8 @@ export interface Account {
   nonce: number;
 }
 
+export type ContractState = Record<string, any>;
+
 // --- Base Transaction and Block Structures ---
 
 export enum TransactionType {

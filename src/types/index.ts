@@ -33,6 +33,20 @@ export interface NodeStatus {
   healthStatus: 'ok' | 'degraded' | 'unreachable';
 }
 
+// Extended status from the actual node backend
+export interface LiveNodeStatus {
+    latestBlockHeight: number;
+    pendingTransactions: number;
+    validatorCount: number;
+    totalStaked: number;
+    activeProposals: number;
+    // FIX: Add missing properties to match the backend response and resolve errors in useNodeStatus.ts.
+    uptime: number;
+    cpuUsage: number;
+    memoryUsage: number;
+}
+
+
 export interface Alert {
   id: string;
   nodeId: string;
@@ -72,7 +86,7 @@ export interface Proposal {
   id: string;
   title: string;
   proposer: string;
-  status: 'active' | 'passed' | 'failed' | 'executed';
+  status: 'active' | 'passed' | 'failed' | 'executed' | 'PENDING' | 'ACTIVE' | 'PASSED' | 'FAILED' | 'EXECUTED';
   description: string;
   votes: {
     yes: number;
@@ -80,6 +94,7 @@ export interface Proposal {
     abstain: number;
   };
   endBlock: number;
+  startBlock?: number;
 }
 
 export interface Vote {
@@ -132,6 +147,8 @@ export interface User {
   role: 'DevOps Engineer' | 'Developer' | 'Auditor' | 'Administrator';
   avatar: string;
   permissions: Set<Permission>;
+  publicKey: string;
+  privateKey: string;
 }
 
 // --- Wallet ---

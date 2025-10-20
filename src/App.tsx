@@ -57,37 +57,24 @@ const AppContent: React.FC = () => {
     setAuditLog(prev => [newEvent, ...prev]);
   }, [currentUser.name]);
 
-  const renderActiveTab = () => {
-    switch (activeTab) {
-      case 'Monitoring':
-        return <MonitoringDashboard {...nodeStatusHook} {...metricAnalysisHook} />;
-      case 'Alerts':
-        return <AlertManager alerts={nodeStatusHook.alerts} />;
-      case 'Logs':
-        return <LogViewer />;
-      case 'Config Generator':
-        return <ConfigGenerator />;
-      case 'Security Scanner':
-        return <SecurityScanner />;
-      case 'CI/CD Pipeline':
-        return <PipelineView />;
-      case 'Wallet':
-        return <WalletView logAction={logAction} />;
-      case 'Staking':
-        return <StakingView logAction={logAction} />;
-      case 'Governance':
-        return <GovernanceView />;
-      case 'Smart Contracts':
-        return <ContractView logAction={logAction} />;
-      case 'Team Management':
-        return <TeamManagementView />;
-      case 'API Keys':
-        return <ApiKeyManagerView logAction={logAction} />;
-       case 'Audit Trail':
-        return <AuditTrailView events={auditLog} />;
-      default:
-        return <MonitoringDashboard {...nodeStatusHook} {...metricAnalysisHook} />;
-    }
+  const renderActiveTabContent = () => {
+    const componentMap: Record<string, React.ReactNode> = {
+      'Monitoring': <MonitoringDashboard {...nodeStatusHook} {...metricAnalysisHook} />,
+      'Alerts': <AlertManager alerts={nodeStatusHook.alerts} />,
+      'Logs': <LogViewer />,
+      'Config Generator': <ConfigGenerator />,
+      'Security Scanner': <SecurityScanner />,
+      'CI/CD Pipeline': <PipelineView />,
+      'Wallet': <WalletView logAction={logAction} />,
+      'Staking': <StakingView logAction={logAction} />,
+      'Governance': <GovernanceView logAction={logAction} />,
+      'Smart Contracts': <ContractView logAction={logAction} />,
+      'Team Management': <TeamManagementView />,
+      'API Keys': <ApiKeyManagerView logAction={logAction} />,
+      'Audit Trail': <AuditTrailView events={auditLog} />,
+    };
+
+    return componentMap[activeTab] || componentMap['Monitoring'];
   };
 
   return (
@@ -97,7 +84,7 @@ const AppContent: React.FC = () => {
         <div className="mb-6">
           <Tabs tabs={visibleTabs.map(t => t.name)} activeTab={activeTab} setActiveTab={setActiveTab} />
         </div>
-        {renderActiveTab()}
+        {renderActiveTabContent()}
       </main>
     </div>
   );

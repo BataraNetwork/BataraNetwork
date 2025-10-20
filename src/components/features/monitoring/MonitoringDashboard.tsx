@@ -18,7 +18,25 @@ interface MonitoringDashboardProps {
   isAnalyzing: boolean;
 }
 
-const HealthStatusIndicator: React.FC<{ status: NodeStatus['healthStatus'] }> = ({ status }) => {
+const formatUptime = (seconds: number): string => {
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
+
+  const days = Math.floor(seconds / (24 * 3600));
+  seconds %= (24 * 3600);
+  const hours = Math.floor(seconds / 3600);
+  seconds %= 3600;
+  const minutes = Math.floor(seconds / 60);
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+  return parts.join(' ');
+};
+
+
+const HealthStatusIndicator: React.FC<{ status: NodeStatus['healthStatus']; uptime: number; }> = ({ status, uptime }) => {
   // FIX: Replaced `JSX.Element` with `React.ReactNode` to resolve "Cannot find namespace 'JSX'" error.
   const styles: Record<NodeStatus['healthStatus'], { text: string; icon: React.ReactNode; label: string }> = {
     ok: { text: 'text-green-400', icon: <CheckCircleIcon className="h-5 w-5" />, label: 'Healthy' },
@@ -32,6 +50,8 @@ const HealthStatusIndicator: React.FC<{ status: NodeStatus['healthStatus'] }> = 
     <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${currentStyle.text} bg-slate-800/60 border border-slate-700`}>
       {currentStyle.icon}
       <span>{currentStyle.label}</span>
+      <span className="text-slate-500 font-normal">|</span>
+      <span className="font-normal text-slate-400">{formatUptime(uptime)} uptime</span>
     </div>
   );
 };
@@ -79,8 +99,8 @@ const AlertCard: React.FC<{ alert: Alert }> = ({ alert }) => (
 );
 
 export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ status, alerts, history, isLoading, error, availableNodes, activeNodeId, setActiveNodeId, analysis, isAnalyzing }) => {
-  if (isLoading) {
-    return <div className="text-center p-8 text-slate-400">Loading node status...</div>;
+  if (isLoading && !status) {
+    return <div className="text-center p-8 text-slate-400">Connecting to Bataranetwork node...</div>;
   }
 
   if (error || !status) {
@@ -95,7 +115,7 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ status
                 <h2 className="text-3xl font-bold text-white">Node Monitoring</h2>
                 <p className="text-slate-400">Real-time enterprise metrics and alerts for the Bataranetwork.</p>
             </div>
-            <HealthStatusIndicator status={status.healthStatus} />
+            <HealthStatusIndicator status={status.healthStatus} uptime={status.uptime} />
         </div>
         <div className="flex-shrink-0 w-full sm:w-auto">
             <label htmlFor="node-selector" className="sr-only">Select a node</label>
@@ -103,11 +123,12 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({ status
                 id="node-selector"
                 value={activeNodeId}
                 onChange={(e) => setActiveNodeId(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 transition disabled:opacity-70 disabled:cursor-not-allowed"
+                disabled // Disabled as we are now connected to a single live node
             >
                 {availableNodes.map(node => (
                     <option key={node.id} value={node.id}>
-                        {node.name} ({node.region})
+                        {node.name} ({node.region}) - Live
                     </option>
                 ))}
             </select>

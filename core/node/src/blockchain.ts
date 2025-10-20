@@ -81,11 +81,11 @@ export class Blockchain {
         return true;
 
       case TransactionType.CONTRACT_CREATION:
-        this.wasmEngine.deployContract(transaction);
+        await this.wasmEngine.deployContract(transaction);
         return true;
         
       case TransactionType.CONTRACT_CALL:
-        this.wasmEngine.executeContract(transaction);
+        await this.wasmEngine.executeContract(transaction);
         return true;
         
       case TransactionType.STAKE:

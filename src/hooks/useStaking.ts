@@ -1,68 +1,75 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Validator } from '../types';
+import { useAuth } from './useAuth';
+import { nodeService } from '../services/nodeService';
+import { hash, sign } from '../utils/crypto';
 
-const MOCK_VALIDATORS: Validator[] = [
-    { address: '0xValidator...1a2b3c', name: 'CosmoStation', stake: 12500000, commission: 5, uptime: 99.98, status: 'active' },
-    { address: '0xValidator...4d5e6f', name: 'Everstake', stake: 11800000, commission: 7, uptime: 99.99, status: 'active' },
-    { address: '0xValidator...7g8h9i', name: 'Figment', stake: 9500000, commission: 10, uptime: 99.95, status: 'active' },
-    { address: '0xValidator...jKlM0p', name: 'Chorus One', stake: 8750000, commission: 8, uptime: 99.97, status: 'active' },
-    { address: '0xValidator...qRsTuV', name: 'P2P.org', stake: 7600000, commission: 6, uptime: 99.96, status: 'active' },
-    { address: '0xValidator...wXyZ12', name: 'Inactive Node', stake: 150000, commission: 100, uptime: 75.2, status: 'inactive' },
-];
-
-let personalStake = 0;
+enum TransactionType {
+  STAKE = 'STAKE',
+}
 
 export const useStaking = () => {
-    const [validators, setValidators] = useState<Validator[]>(MOCK_VALIDATORS);
-    const [stakedAmount, setStakedAmount] = useState(personalStake);
+    const [validators, setValidators] = useState<Validator[]>([]);
+    const [totalStaked, setTotalStaked] = useState(0);
+    const [stakedAmount, setStakedAmount] = useState(0); // This is simulated for the user
+    const [isLoading, setIsLoading] = useState(true);
+    const { currentUser } = useAuth();
 
-    const totalStaked = validators.reduce((acc, v) => acc + v.stake, 0);
-
-    const stakeTokens = useCallback((validatorAddress: string, amount: number): { success: boolean; message: string } => {
-        const validator = validators.find(v => v.address === validatorAddress);
-
-        if (!validator) {
-            return { success: false, message: 'Validator not found.' };
+    const fetchValidators = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            const data = await nodeService.getValidators();
+            setValidators(data);
+            const total = data.reduce((sum: number, v: { stake: number }) => sum + v.stake, 0);
+            setTotalStaked(total);
+        } catch (error) {
+            console.error("Failed to fetch validators:", error);
+        } finally {
+            setIsLoading(false);
         }
+    }, []);
 
-        if (validator.status === 'inactive') {
-            return { success: false, message: 'Cannot stake on an inactive validator.' };
-        }
-
-        setValidators(prev => prev.map(v => 
-            v.address === validatorAddress ? { ...v, stake: v.stake + amount } : v
-        ));
-        personalStake += amount;
-        setStakedAmount(personalStake);
-        return { success: true, message: 'Stake successful.' };
-    }, [validators]);
+    useEffect(() => {
+        fetchValidators();
+        const interval = setInterval(fetchValidators, 10000);
+        return () => clearInterval(interval);
+    }, [fetchValidators]);
     
-    const unstakeTokens = useCallback((validatorAddress: string, amount: number): { success: boolean; message: string } => {
-        const validator = validators.find(v => v.address === validatorAddress);
-
-        if (!validator) {
-            return { success: false, message: 'Validator not found.' };
+    const stakeTokens = useCallback(async (validatorAddress: string, amount: number) => {
+        try {
+            const account = await nodeService.getAccount(currentUser.publicKey);
+            if (account.balance < amount + 2) { // 2 is fee
+                return { success: false, message: 'Insufficient funds for stake + fee.' };
+            }
+            const txData = {
+                from: currentUser.publicKey,
+                validator: validatorAddress,
+                amount: amount,
+                nonce: account.nonce,
+                fee: 2,
+                type: TransactionType.STAKE,
+            };
+            const txId = hash(txData);
+            const signature = sign(txId, currentUser.privateKey);
+            
+            await nodeService.broadcastTransaction({ ...txData, id: txId, signature });
+            setStakedAmount(prev => prev + amount); // Optimistic update
+            return { success: true, message: 'Stake transaction broadcasted.' };
+        } catch (error: any) {
+            console.error("Staking failed:", error);
+            return { success: false, message: error.response?.data?.error || 'Broadcast failed.' };
         }
+    }, [currentUser]);
 
-        if (validator.status === 'inactive') {
-            return { success: false, message: 'Cannot unstake from inactive validator.' };
-        }
-        
+    const unstakeTokens = useCallback(async (validatorAddress: string, amount: number) => {
+        // The backend doesn't have an "unstake" transaction type, so we simulate it on the frontend.
+        // A real implementation would require a specific transaction type.
         if (amount > stakedAmount) {
-            return { success: false, message: 'Amount exceeds your personal stake.' };
+            return { success: false, message: 'Cannot unstake more than you have staked.' };
         }
-        
-        if (amount > validator.stake) {
-            return { success: false, message: "Amount exceeds validator's total stake." };
-        }
-        
-        setValidators(prev => prev.map(v => 
-            v.address === validatorAddress ? { ...v, stake: Math.max(0, v.stake - amount) } : v
-        ));
-        personalStake = Math.max(0, personalStake - amount);
-        setStakedAmount(personalStake);
-        return { success: true, message: 'Unstake successful.' };
-    }, [validators, stakedAmount]);
+        setStakedAmount(prev => prev - amount);
+        return { success: true, message: 'Unstake successful (simulated).' };
+    }, [stakedAmount]);
 
-    return { validators, totalStaked, stakedAmount, stakeTokens, unstakeTokens };
+    return { validators, totalStaked, stakedAmount, stakeTokens, unstakeTokens, isLoading };
 };

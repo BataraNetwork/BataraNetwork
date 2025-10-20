@@ -34,10 +34,11 @@ describe('Blockchain', () => {
         await storage.open();
         mempool = new Mempool();
         stakingManager = new StakingManager([]);
-        wasmEngine = new WasmEngine();
         governanceModule = new GovernanceModule();
         // Instantiate the new StateManager
         stateManager = new StateManager(storage);
+        // FIX: The WasmEngine constructor now requires a StateManager instance.
+        wasmEngine = new WasmEngine(stateManager);
 
         blockchain = new Blockchain(storage, mempool, stakingManager, wasmEngine, governanceModule, stateManager);
         await blockchain.initialize();

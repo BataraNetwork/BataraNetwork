@@ -1,5 +1,5 @@
 import { Level } from 'level';
-import { Block, Account } from '../types';
+import { Block, Account, ContractState } from '../types';
 
 const LATEST_BLOCK_KEY = 'latest_block';
 
@@ -75,5 +75,23 @@ export class LevelStorage {
       batch.put(`account:${account.address}`, account);
     }
     await batch.write();
+  }
+
+  // --- Contract State Methods ---
+  
+  async getContractState(contractId: string): Promise<ContractState | null> {
+    try {
+      const state = await this.db.get(`contract:${contractId}`);
+      return state;
+    } catch (error: any) {
+      if (error.code === 'LEVEL_NOT_FOUND') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async saveContractState(contractId: string, state: ContractState): Promise<void> {
+    await this.db.put(`contract:${contractId}`, state);
   }
 }

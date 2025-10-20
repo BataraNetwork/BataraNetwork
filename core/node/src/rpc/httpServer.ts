@@ -1,5 +1,6 @@
 // core/node/src/rpc/httpServer.ts
-
+import os from 'os';
+import process from 'process';
 import express from 'express';
 import { Blockchain } from '../blockchain';
 import { Mempool } from '../mempool';
@@ -7,7 +8,11 @@ import { P2pService } from '../p2p/p2pService';
 import { StakingManager } from '../staking/stakingManager';
 import { GovernanceModule } from '../governance/governanceModule';
 import { StateManager } from '../state/stateManager';
-import { Transaction } from '../types';
+import { Transaction, ProposalStatus } from '../types';
+import { WasmEngine } from '../vm/wasmEngine';
+
+let lastCpuUsage = process.cpuUsage();
+let lastCpuTime = process.hrtime.bigint();
 
 export class HttpServer {
   private app: express.Application;
@@ -19,10 +24,17 @@ export class HttpServer {
     private stakingManager: StakingManager,
     private governanceModule: GovernanceModule,
     private stateManager: StateManager,
+    private wasmEngine: WasmEngine,
     port: number
   ) {
     this.app = express();
     this.app.use(express.json());
+    // A simple CORS middleware for development
+    this.app.use((req, res, next) => {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+        next();
+    });
     this.initializeRoutes();
     this.app.listen(port, () => {
       console.log(`HTTP server listening on port ${port}`);
@@ -32,9 +44,27 @@ export class HttpServer {
   private initializeRoutes(): void {
     // --- Blockchain Routes ---
     this.app.get('/status', (req, res) => {
+      const activeProposals = this.governanceModule.getProposals().filter(p => p.status === ProposalStatus.ACTIVE).length;
+      const validators = this.stakingManager.getActiveValidators();
+      
+      // Calculate CPU Usage
+      const now = process.hrtime.bigint();
+      const timeDiff = now - lastCpuTime;
+      const usage = process.cpuUsage(lastCpuUsage);
+      lastCpuTime = now;
+      lastCpuUsage = usage;
+      const cpuPercent = (100 * (usage.user + usage.system) / (Number(timeDiff) * 1000));
+
       res.json({
         latestBlockHeight: this.blockchain.getLatestBlock().height,
         pendingTransactions: this.mempool.getPendingTransactions().length,
+        validatorCount: validators.length,
+        totalStaked: validators.reduce((sum, v) => sum + v.amount, 0),
+        activeProposals: activeProposals,
+        // New live metrics
+        uptime: Math.floor(process.uptime()),
+        memoryUsage: parseFloat(((process.memoryUsage().rss / (1024 * 1024 * 1024)) * 100).toFixed(2)), // as % of 1GB
+        cpuUsage: parseFloat(cpuPercent.toFixed(2)),
       });
     });
     this.app.get('/block/:height', async (req, res) => {
@@ -124,6 +154,24 @@ export class HttpServer {
             res.status(400).json({ error: 'Invalid vote transaction' });
         }
     });
+    
+    // --- Contract Routes ---
+    this.app.get('/contracts', (req, res) => {
+        res.json(this.wasmEngine.getDeployedContracts());
+    });
+
+    this.app.get('/contract/:id/state', async (req, res) => {
+        const { id } = req.params;
+        if (!id) return res.status(400).json({ error: 'Contract ID is required' });
+        try {
+            const state = await this.stateManager.getContractState(id);
+            res.json(state);
+        } catch (error) {
+            console.error(`Error fetching contract state for ${id}:`, error);
+            res.status(500).json({ error: 'Failed to retrieve contract state' });
+        }
+    });
+
 
     // --- Health Check ---
     this.app.get('/health', async (req, res) => {

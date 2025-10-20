@@ -1,78 +1,116 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Contract, ContractInteraction } from '../types';
+import { useAuth } from './useAuth';
+import { nodeService } from '../services/nodeService';
+import { hash, sign } from '../utils/crypto';
 
-const MOCK_CONTRACTS: Contract[] = [
-    {
-        id: '1',
-        name: 'BTR Token',
-        address: '0xContract...a1b2c3',
-        balance: 1000000,
-        methods: ['totalSupply()', 'balanceOf(address)', 'transfer(address, uint256)'],
-    },
-    {
-        id: '2',
-        name: 'Staking Pool',
-        address: '0xContract...d4e5f6',
-        balance: 500000,
-        methods: ['stake()', 'unstake(uint256)', 'getReward()'],
-    },
-    {
-        id: '3',
-        name: 'Voting Contract',
-        address: '0xContract...g7h8i9',
-        balance: 0,
-        methods: ['vote(proposalId, bool)', 'getProposal(proposalId)'],
-    },
-];
+enum TransactionType {
+  CONTRACT_CREATION = 'CONTRACT_CREATION',
+  CONTRACT_CALL = 'CONTRACT_CALL',
+}
 
-let interactionCounter = 1;
-let contractIdCounter = 4;
+const MOCK_INTERACTIONS: ContractInteraction[] = [];
 
 export const useSmartContracts = () => {
-    const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
-    const [interactions, setInteractions] = useState<ContractInteraction[]>([]);
-
-    const callMethod = useCallback((contractId: string, method: string, params: any[]): ContractInteraction | null => {
-        const contract = contracts.find(c => c.id === contractId);
-        if (!contract) return null;
-
-        // Simulate a result
-        let result: any;
-        if (method.includes('balanceOf')) {
-            result = { balance: Math.floor(Math.random() * 1000) };
-        } else if (method.includes('totalSupply')) {
-            result = { supply: contract.balance };
-        } else {
-            result = { success: true, transactionHash: `0x${[...Array(64)].map(() => Math.floor(Math.random() * 16).toString(16)).join('')}` };
+    const [contracts, setContracts] = useState<Contract[]>([]);
+    const [interactions, setInteractions] = useState<ContractInteraction[]>(MOCK_INTERACTIONS);
+    const [isLoading, setIsLoading] = useState(true);
+    const { currentUser } = useAuth();
+    
+    const fetchContracts = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            const data = await nodeService.getContracts();
+            // The backend doesn't return balance or methods, so we add mock data for UI.
+            const augmentedContracts = data.map((c: any) => ({
+                id: c.id,
+                name: `Contract-${c.id.substring(0, 6)}`,
+                address: c.id,
+                balance: Math.floor(Math.random() * 1000),
+                methods: ['getState()', 'setState(key, value)', 'increment()']
+            }));
+            setContracts(augmentedContracts);
+        } catch (e) {
+            console.error("Failed to fetch contracts:", e);
+        } finally {
+            setIsLoading(false);
         }
-
-        const newInteraction: ContractInteraction = {
-            id: interactionCounter++,
-            contractId,
-            method,
-            params,
-            result,
-            timestamp: new Date().toLocaleString(),
-        };
-
-        setInteractions(prev => [newInteraction, ...prev.slice(0, 9)]);
-        return newInteraction;
-    }, [contracts]);
-
-    const deployContract = useCallback((name: string, bytecode: string, initialState: string): Contract => {
-        const newContract: Contract = {
-            id: String(contractIdCounter++),
-            name,
-            // Simulate address generation
-            address: `0xContract...${Math.random().toString(16).slice(2, 8)}`,
-            balance: 0,
-            // Simulate method discovery from bytecode
-            methods: ['constructor()', 'getValue()', 'setValue(uint256)'],
-        };
-        setContracts(prev => [newContract, ...prev]);
-        return newContract;
     }, []);
 
+    useEffect(() => {
+        fetchContracts();
+        const interval = setInterval(fetchContracts, 10000);
+        return () => clearInterval(interval);
+    }, [fetchContracts]);
 
-    return { contracts, interactions, callMethod, deployContract };
+    const callMethod = useCallback(async (contractId: string, method: string, params: any[]) => {
+        try {
+            const account = await nodeService.getAccount(currentUser.publicKey);
+            const functionName = method.split('(')[0];
+
+            const txData = {
+                from: currentUser.publicKey,
+                contractId,
+                function: functionName,
+                args: params,
+                nonce: account.nonce,
+                fee: 5,
+                type: TransactionType.CONTRACT_CALL,
+            };
+            const txId = hash(txData);
+            const signature = sign(txId, currentUser.privateKey);
+            const transaction = { ...txData, id: txId, signature };
+
+            const result = await nodeService.broadcastTransaction(transaction);
+
+            const newInteraction: ContractInteraction = {
+                id: MOCK_INTERACTIONS.length + 1,
+                contractId,
+                method,
+                params,
+                result,
+                timestamp: new Date().toLocaleString(),
+            };
+            MOCK_INTERACTIONS.unshift(newInteraction);
+            setInteractions([...MOCK_INTERACTIONS]);
+            return newInteraction;
+        } catch (e: any) {
+            console.error("Contract call failed:", e);
+            return null;
+        }
+    }, [currentUser]);
+
+    const deployContract = useCallback(async (name: string, bytecode: string, initialState: string) => {
+        try {
+            const account = await nodeService.getAccount(currentUser.publicKey);
+            let parsedInitialState = {};
+            try {
+                if (initialState) parsedInitialState = JSON.parse(initialState);
+            } catch {
+                console.error("Invalid JSON for initial state.");
+                // We could return an error here.
+            }
+
+            const txData = {
+                from: currentUser.publicKey,
+                code: bytecode, // In reality, this would be base64 encoded WASM
+                initialState: parsedInitialState,
+                nonce: account.nonce,
+                fee: 25, // Higher fee for deployment
+                type: TransactionType.CONTRACT_CREATION,
+            };
+            const txId = hash(txData);
+            const signature = sign(txId, currentUser.privateKey);
+            const transaction = { ...txData, id: txId, signature };
+            
+            await nodeService.broadcastTransaction(transaction);
+            // We can't know the contract ID here, but we can refetch or just return the tx.
+            return transaction;
+        } catch (e) {
+            console.error("Contract deployment failed:", e);
+            return null;
+        }
+    }, [currentUser]);
+
+    return { contracts, interactions, callMethod, deployContract, isLoading };
 };

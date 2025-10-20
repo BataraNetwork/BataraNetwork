@@ -1,69 +1,106 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Proposal, Vote } from '../types';
+import { nodeService } from '../services/nodeService';
+import { useAuth } from './useAuth';
+import { hash, sign } from '../utils/crypto';
 
-const MOCK_PROPOSALS: Proposal[] = [
-    {
-        id: 'BIP-42',
-        title: 'Increase Block Size to 2MB',
-        proposer: '0xDev...a1b2c3',
-        status: 'active',
-        description: 'This proposal aims to increase the maximum block size from 1MB to 2MB to improve transaction throughput.',
-        votes: { yes: 12500000, no: 345000, abstain: 1200000 },
-        endBlock: 123456,
-    },
-    {
-        id: 'BIP-41',
-        title: 'Community Fund Grant for Tooling',
-        proposer: '0xDAO...d4e5f6',
-        status: 'passed',
-        description: 'Allocate 50,000 BTR from the community fund to a team building a new block explorer.',
-        votes: { yes: 25000000, no: 120000, abstain: 500000 },
-        endBlock: 110000,
-    },
-    {
-        id: 'BIP-40',
-        title: 'Reduce Validator Commission Rate',
-        proposer: '0xUser...g7h8i9',
-        status: 'failed',
-        description: 'This proposal suggests capping the maximum validator commission rate at 5%.',
-        votes: { yes: 8000000, no: 15000000, abstain: 2000000 },
-        endBlock: 105000,
-    },
-];
-
-let proposalIdCounter = 43;
+// Re-defining for frontend usage
+enum TransactionType {
+  GOVERNANCE_PROPOSAL = 'GOVERNANCE_PROPOSAL',
+  GOVERNANCE_VOTE = 'GOVERNANCE_VOTE',
+}
 
 export const useGovernance = () => {
-    const [proposals, setProposals] = useState<Proposal[]>(MOCK_PROPOSALS);
+    const [proposals, setProposals] = useState<Proposal[]>([]);
     const [userVotes, setUserVotes] = useState<Record<string, Vote['option']>>({});
+    const [isLoading, setIsLoading] = useState(true);
+    const { currentUser } = useAuth();
 
-    const castVote = useCallback((proposalId: string, option: Vote['option']) => {
-        if (userVotes[proposalId]) return; // Already voted
-
-        setProposals(prev => prev.map(p => {
-            if (p.id === proposalId) {
-                const newVotes = { ...p.votes, [option]: p.votes[option] + 1000 }; // Simulate 1000 vote power
-                return { ...p, votes: newVotes };
-            }
-            return p;
-        }));
-
-        setUserVotes(prev => ({ ...prev, [proposalId]: option }));
-    }, [userVotes]);
-
-    const submitProposal = useCallback((data: { title: string; description: string; endBlock: number; proposer: string }): Proposal => {
-        const newProposal: Proposal = {
-            id: `BIP-${proposalIdCounter++}`,
-            title: data.title,
-            proposer: data.proposer,
-            status: 'active',
-            description: data.description,
-            votes: { yes: 0, no: 0, abstain: 0 },
-            endBlock: data.endBlock,
-        };
-        setProposals(prev => [newProposal, ...prev]);
-        return newProposal;
+    const fetchProposals = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            const data = await nodeService.getProposals();
+            setProposals(data);
+        } catch (error) {
+            console.error("Failed to fetch proposals:", error);
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
 
-    return { proposals, userVotes, castVote, submitProposal };
+    useEffect(() => {
+        fetchProposals();
+        const interval = setInterval(fetchProposals, 10000); // Poll every 10s
+        return () => clearInterval(interval);
+    }, [fetchProposals]);
+
+    const castVote = useCallback(async (proposalId: string, option: Vote['option']) => {
+        const account = await nodeService.getAccount(currentUser.publicKey);
+        const txData = {
+            from: currentUser.publicKey,
+            proposalId,
+            vote: option,
+            nonce: account.nonce,
+            fee: 1,
+            type: TransactionType.GOVERNANCE_VOTE,
+        };
+        const txId = hash(txData);
+        const signature = sign(txId, currentUser.privateKey);
+
+        const transaction = {
+            ...txData,
+            id: txId,
+            signature,
+        };
+
+        try {
+            await nodeService.broadcastTransaction(transaction);
+            setUserVotes(prev => ({ ...prev, [proposalId]: option }));
+        } catch (error) {
+            console.error("Failed to cast vote:", error);
+        }
+    }, [currentUser]);
+
+    const submitProposal = useCallback(async (proposalData: { title: string, description: string, endBlock: number, proposer: string }) => {
+        const account = await nodeService.getAccount(proposalData.proposer);
+        const txData = {
+            from: proposalData.proposer,
+            title: proposalData.title,
+            description: proposalData.description,
+            endBlock: proposalData.endBlock,
+            nonce: account.nonce,
+            fee: 10, // Higher fee for proposals
+            type: TransactionType.GOVERNANCE_PROPOSAL,
+        };
+        const txId = hash(txData);
+        const signature = sign(txId, currentUser.privateKey);
+
+        const transaction = {
+            ...txData,
+            id: txId,
+            signature,
+        };
+        
+        try {
+            await nodeService.broadcastTransaction(transaction);
+            // After successful broadcast, create a mock proposal to show in UI immediately
+            const newProposal: Proposal = {
+                id: txId,
+                proposer: proposalData.proposer,
+                title: proposalData.title,
+                description: proposalData.description,
+                status: 'PENDING', // Will become active in the next block
+                endBlock: proposalData.endBlock,
+                votes: { yes: 0, no: 0, abstain: 0 },
+                startBlock: 0, // Placeholder
+            };
+            setProposals(prev => [newProposal, ...prev]);
+            return newProposal;
+        } catch (error) {
+            console.error("Failed to submit proposal:", error);
+            return null;
+        }
+    }, [currentUser]);
+
+    return { proposals, userVotes, castVote, submitProposal, isLoading };
 };

@@ -1,7 +1,7 @@
 // core/node/src/state/stateManager.ts
 
 import { LevelStorage } from '../storage/level';
-import { Account, Transaction, TransactionType } from '../types';
+import { Account, Transaction, TransactionType, ContractState } from '../types';
 
 /**
  * Manages the world state of the blockchain, such as account balances and nonces.
@@ -89,5 +89,26 @@ export class StateManager {
 
     await this.storage.batchUpdateAccounts(accountsToUpdate);
     return true;
+  }
+
+  // --- Contract State Management ---
+
+  /**
+   * Retrieves the state for a given smart contract.
+   * @param contractId The ID of the contract.
+   * @returns The contract's state, or an empty object if it doesn't exist.
+   */
+  public async getContractState(contractId: string): Promise<ContractState> {
+    const state = await this.storage.getContractState(contractId);
+    return state || {};
+  }
+
+  /**
+   * Saves the state for a given smart contract.
+   * @param contractId The ID of the contract.
+   * @param state The new state to save.
+   */
+  public async saveContractState(contractId: string, state: ContractState): Promise<void> {
+    await this.storage.saveContractState(contractId, state);
   }
 }

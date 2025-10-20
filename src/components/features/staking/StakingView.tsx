@@ -13,36 +13,39 @@ const StatCard: React.FC<{ title: string; value: string | number; }> = ({ title,
 
 const ValidatorRow: React.FC<{ 
     validator: Validator, 
-    onStake: (address: string, amount: number) => { success: boolean, message: string },
-    onUnstake: (address: string, amount: number) => { success: boolean, message: string },
+    onStake: (address: string, amount: number) => Promise<{ success: boolean, message: string }>,
+    onUnstake: (address: string, amount: number) => Promise<{ success: boolean, message: string }>,
 }> = ({ validator, onStake, onUnstake }) => {
     const [stakeAmount, setStakeAmount] = useState('');
     const [unstakeAmount, setUnstakeAmount] = useState('');
     const [stakeError, setStakeError] = useState<string | null>(null);
     const [unstakeError, setUnstakeError] = useState<string | null>(null);
+    const [isStaking, setIsStaking] = useState(false);
     const { currentUser } = useAuth();
     const canStake = currentUser.permissions.has('action:stake');
 
-    const handleStake = (e: React.FormEvent) => {
+    const handleStake = async (e: React.FormEvent) => {
         e.preventDefault();
         setStakeError(null);
+        setIsStaking(true);
         const amount = parseInt(stakeAmount, 10);
         if (!isNaN(amount) && amount > 0) {
-            const result = onStake(validator.address, amount);
+            const result = await onStake(validator.address, amount);
             if (result.success) {
                 setStakeAmount('');
             } else {
                 setStakeError(result.message);
             }
         }
+        setIsStaking(false);
     };
     
-    const handleUnstake = (e: React.FormEvent) => {
+    const handleUnstake = async (e: React.FormEvent) => {
         e.preventDefault();
         setUnstakeError(null);
         const amount = parseInt(unstakeAmount, 10);
         if (!isNaN(amount) && amount > 0) {
-            const result = onUnstake(validator.address, amount);
+            const result = await onUnstake(validator.address, amount);
             if (!result.success) {
                 setUnstakeError(result.message);
             } else {
@@ -55,7 +58,7 @@ const ValidatorRow: React.FC<{
         <tr className="border-b border-slate-700 last:border-b-0 hover:bg-slate-800/30">
             <td className="p-4">
                 <div className="font-bold text-white">{validator.name}</div>
-                <div className="text-xs text-slate-500 font-mono">{validator.address}</div>
+                <div className="text-xs text-slate-500 font-mono truncate max-w-xs">{validator.address}</div>
             </td>
             <td className="p-4 text-right font-mono text-white">{validator.stake.toLocaleString()}</td>
             <td className="p-4 text-right text-slate-300">{validator.commission}%</td>
@@ -82,14 +85,14 @@ const ValidatorRow: React.FC<{
                                 }}
                                 placeholder="Amount"
                                 className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
-                                disabled={!canStake || validator.status === 'inactive'}
+                                disabled={!canStake || validator.status === 'inactive' || isStaking}
                                 title={validator.status === 'inactive' ? 'Cannot stake on an inactive validator' : ''}
                             />
                             <button 
                                 type="submit" 
                                 className="bg-sky-600 rounded px-3 py-1.5 text-white text-xs font-semibold hover:bg-sky-500 transition disabled:bg-slate-600 disabled:cursor-not-allowed" 
-                                disabled={!canStake || !stakeAmount || validator.status === 'inactive'}>
-                                Stake
+                                disabled={!canStake || !stakeAmount || validator.status === 'inactive' || isStaking}>
+                                {isStaking ? '...' : 'Stake'}
                             </button>
                         </div>
                         {stakeError && <p className="text-xs text-red-400 mt-1">{stakeError}</p>}
@@ -125,11 +128,11 @@ const ValidatorRow: React.FC<{
 };
 
 export const StakingView: React.FC<{ logAction: (action: string, details: Record<string, any>) => void }> = ({ logAction }) => {
-    const { validators, totalStaked, stakedAmount, stakeTokens, unstakeTokens } = useStaking();
+    const { validators, totalStaked, stakedAmount, stakeTokens, unstakeTokens, isLoading } = useStaking();
     
-    const handleStakeTokens = (address: string, amount: number) => {
+    const handleStakeTokens = async (address: string, amount: number) => {
         const validator = validators.find(v => v.address === address);
-        const result = stakeTokens(address, amount);
+        const result = await stakeTokens(address, amount);
         if (result.success) {
             logAction('staking.stake', { 
                 validator: validator?.name || address,
@@ -139,9 +142,9 @@ export const StakingView: React.FC<{ logAction: (action: string, details: Record
         return result;
     };
 
-    const handleUnstakeTokens = (address: string, amount: number) => {
+    const handleUnstakeTokens = async (address: string, amount: number) => {
         const validator = validators.find(v => v.address === address);
-        const result = unstakeTokens(address, amount);
+        const result = await unstakeTokens(address, amount);
         if (result.success) {
             logAction('staking.unstake', { 
                 validator: validator?.name || address,
@@ -160,11 +163,12 @@ export const StakingView: React.FC<{ logAction: (action: string, details: Record
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <StatCard title="Total Staked (BTR)" value={totalStaked.toLocaleString()} />
-                <StatCard title="Your Stake (BTR)" value={stakedAmount.toLocaleString()} />
+                <StatCard title="Your Stake (BTR)" value={`${stakedAmount.toLocaleString()} (simulated)`} />
                 <StatCard title="Active Validators" value={validators.filter(v => v.status === 'active').length} />
             </div>
 
              <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-x-auto">
+                {isLoading ? <div className="text-center p-8 text-slate-400">Loading validator data...</div> :
                 <table className="min-w-full text-sm">
                     <thead className="bg-slate-800 text-left text-slate-400">
                         <tr>
@@ -180,6 +184,7 @@ export const StakingView: React.FC<{ logAction: (action: string, details: Record
                         {validators.map(v => <ValidatorRow key={v.address} validator={v} onStake={handleStakeTokens} onUnstake={handleUnstakeTokens} />)}
                     </tbody>
                 </table>
+                }
              </div>
 
         </div>
