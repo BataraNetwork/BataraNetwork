@@ -7,41 +7,49 @@ The project is architected as a monorepo, containing the core blockchain node, m
 ![Dashboard Screenshot Placeholder](https://i.imgur.com/your-screenshot.png)
 *(A real screenshot of the dashboard should be placed here)*
 
-## 🚀 DevOps Dashboard - The Command Center
+## 🚀 Quick Start
 
-The heart of this project is a modern, React-based DevOps dashboard that provides a comprehensive suite of tools for managing and monitoring the Bataranetwork node.
+Get the entire Bataranetwork ecosystem—the blockchain node, the block explorer, and the DevOps dashboard—running in minutes.
 
-### Key Features
+### Prerequisites
+- Node.js (v20+)
+- pnpm (`npm install -g pnpm`)
+- Docker and Docker Compose
 
--   **🤖 AI Config Generator**: Generate production-ready configuration files (`Dockerfile`, `Kubernetes`, `Helm`, etc.) with natural language prompts, powered by the Gemini API.
--   **📈 Real-time Monitoring**: A live dashboard displaying key node metrics like block height, pending transactions, CPU/memory usage, and more.
--   **🧠 AI Anomaly Detection**: An AIOps feature that uses the Gemini API to analyze metric history and proactively identify unusual patterns or potential issues.
--   **🛡️ AI Security Scanner**: Analyze configuration files for security vulnerabilities and get AI-powered remediation advice.
--   **🚨 Alert Management**: View and manage system alerts. Includes an AI feature to generate step-by-step remediation plans for active alerts.
--   **📜 Live Log Streaming**: A real-time log viewer with search, filtering, and an AI analysis feature to summarize log patterns and errors.
--   **🚀 CI/CD Pipeline Simulation**: A visual dashboard to trigger, monitor, and approve a simulated CI/CD pipeline for the node, including deployment history.
--   **🗳️ On-Chain Governance UI**: A dedicated interface to view, submit, and vote on on-chain governance proposals.
--   **💰 Staking & Validator UI**: An interface to view network validators and simulate staking BTR tokens.
--   **📜 Smart Contract UI**: A tool to view and interact with deployed smart contracts directly from the dashboard.
--   **🔐 Role-Based Access Control (RBAC)**: A simulated multi-user environment with roles like `Admin`, `DevOps`, and `Auditor`, where UI actions are restricted based on permissions.
--   **🔑 API Key Management**: A secure UI for administrators to create and revoke API keys for the node.
--   **📋 Audit Trail**: A comprehensive log of all significant user actions performed within the dashboard.
+### Running the Ecosystem
+1.  **Set Gemini API Key**: The DevOps Dashboard uses the Google Gemini API for its AI features. Create a `.env` file in the project root and add your key:
+    ```
+    API_KEY="YOUR_GEMINI_API_KEY"
+    ```
+    See the [Development Guide](docs/development-guide.md) for more details.
 
-### Technology Stack
+2.  **Install Dependencies**: Install all dependencies for all packages in the monorepo.
+    ```sh
+    pnpm install
+    ```
 
--   **Frontend**: React, TypeScript, Vite, Tailwind CSS
--   **AI Integration**: Google Gemini API
--   **Charting**: Recharts
+3.  **Run in Development Mode**: This command concurrently starts the blockchain node, the block explorer (frontend & backend), and the DevOps dashboard with hot-reloading.
+    ```sh
+    pnpm dev
+    ```
 
-### Getting Started with the Dashboard
+You can now access:
+- **DevOps Dashboard**: `http://localhost:5173`
+- **Block Explorer**: `http://localhost:5174` (or its configured port)
+- **Node HTTP API**: `http://localhost:3000`
 
-1.  **Set `API_KEY`**: To enable the AI features, you must set your Google Gemini API key as an environment variable named `API_KEY`. See `docs/development-guide.md` for detailed instructions.
-2.  **Install Dependencies**: Run `npm install` at the root of the project.
-3.  **Run the Dashboard**: Run `npm run dev`. This will start the Vite development server.
+## 📦 Monorepo Overview
+
+-   `src/`: The main DevOps Dashboard React application.
+-   `core/node/`: The core blockchain node built in TypeScript.
+-   `explorer/`: The public-facing block explorer, with its own frontend and backend.
+-   `sdk/`: SDKs for interacting with the node in different languages (JS, Go, Python).
+-   `api/`: Serverless functions that power the AI features of the DevOps Dashboard.
+-   `docs/`: All project documentation, including architecture, API specs, and guides.
 
 ## 🔗 Bataranetwork Blockchain Core
 
-The `core/node` is a fully-featured blockchain node built from scratch in TypeScript. It has evolved from a simple PoA simulation into a stateful, Proof-of-Stake L1 prototype.
+The `core/node` is a fully-featured blockchain node built from scratch in TypeScript. It has evolved from a simple PoA simulation into a stateful, Proof-of-Stake L1 prototype. See the [Architecture Overview](docs/architecture-overview.md) for a deep dive.
 
 ### Core Features
 
@@ -50,7 +58,7 @@ The `core/node` is a fully-featured blockchain node built from scratch in TypeSc
 -   **WASM Smart Contract Engine**: A simulated engine for deploying and executing WASM-based smart contracts.
 -   **On-Chain Governance**: A module for submitting and voting on proposals directly on the blockchain.
 -   **P2P Networking**: A simple TCP-based peer-to-peer layer for broadcasting blocks and transactions.
--   **RPC APIs**: Exposes both a JSON RPC (HTTP) and a gRPC API for client interaction.
+-   **RPC APIs**: Exposes both a JSON RPC (HTTP) and a gRPC API for client interaction. See the [API Specification](docs/api-specifications.md).
 -   **Persistent Storage**: Uses LevelDB for storing blockchain data.
 
 ## The BATARA (BTR) Token
@@ -61,18 +69,9 @@ The `core/node` is a fully-featured blockchain node built from scratch in TypeSc
 2.  **Staking**: BTR is staked by validators to secure the network under the Proof-of-Stake consensus mechanism. Token holders can delegate their BTR to validators to participate in securing the network and earn rewards.
 3.  **Governance**: BTR holders can participate in on-chain governance by voting on proposals that shape the future of the network, such as protocol upgrades or changes to network parameters.
 
-## 🛠️ Developer Ecosystem
-
--   **JavaScript/TypeScript SDK (`sdk/js`)**: A comprehensive SDK for building web applications and services that interact with the node.
--   **Go SDK (`sdk/go`)**: An idiomatic Go SDK for building backend services and tools. Includes a full cryptography suite.
--   **Python SDK (`sdk/py`)**: An idiomatic Python SDK, fully type-hinted, for scripting, automation, and data analysis.
--   **Node.js CLI (`core/cli`)**: A command-line interface for wallet management and on-chain interactions.
--   **Go CLI (`sdk/go/cmd/batara-cli-go`)**: A native Go CLI for deploying and calling smart contracts.
--   **Block Explorer (`explorer`)**: A simple web-based explorer to view blocks and transactions.
-
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](docs/contributing.md) for more details on how to get involved.
+We welcome contributions! Please see our [Contributing Guide](.github/CONTRIBUTING.md) for more details on how to get involved.
 
 ## 📄 License
 

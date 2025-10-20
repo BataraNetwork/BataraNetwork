@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 type IconProps = {
@@ -45,6 +46,13 @@ export const SparklesIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => 
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.293 2.293a1 1 0 010 1.414L15 12l-2.293-2.293a1 1 0 010-1.414L15 6m-5 16l2.293-2.293a1 1 0 000-1.414L10 12l-2.293 2.293a1 1 0 000 1.414L10 18m0-12l-2.293 2.293a1 1 0 000 1.414L10 12l2.293-2.293a1 1 0 000-1.414L10 6m5 16l-2.293-2.293a1 1 0 010-1.414L15 12l2.293 2.293a1 1 0 010 1.414L15 18m-5-4l2-2m-2 2l-2-2" />
     </svg>
 );
+
+export const WrenchScrewdriverIcon: React.FC<IconProps> = ({ className = 'h-6 w-6' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.83-5.83M11.42 15.17l-4.244-4.243L1.17 19.829a1.125 1.125 0 0 0 1.591 1.591l6.499-6.499ZM11.42 15.17 15.17 11.42m0 0L21 5.25v-1.5a2.25 2.25 0 0 0-2.25-2.25h-1.5L11.42 11.42Z" />
+    </svg>
+);
+
 
 export const ClipboardIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">

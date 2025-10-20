@@ -1,4 +1,6 @@
 // core/node/src/index.ts
+// FIX: Import the 'process' module to resolve type errors for process.env and process.exit.
+import process from 'process';
 import { LevelStorage } from './storage/level';
 import { Blockchain } from './blockchain';
 import { Mempool } from './mempool';

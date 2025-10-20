@@ -1,227 +1,199 @@
-import React, { useState, useEffect, useMemo } from 'react';
+// FIX: Created missing ContractView.tsx file.
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSmartContracts } from '../../../hooks/useSmartContracts';
-import { Contract } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
-import { CodeBlock } from '../../ui/CodeBlock';
-import { CodeBracketIcon, FilePlusIcon } from '../../ui/icons';
+import { DeployedContract } from '../../../types';
+import { FilePlusIcon, CodeBracketIcon, PlayCircleIcon, CubeIcon } from '../../ui/icons';
 
-const ContractCard: React.FC<{
-  contract: Contract;
-  onCallMethod: (contractId: string, method: string, params: any[]) => void;
-}> = ({ contract, onCallMethod }) => {
-  const [selectedMethod, setSelectedMethod] = useState(contract.methods[0]);
-  const [paramValues, setParamValues] = useState<string[]>([]);
-  const { currentUser } = useAuth();
-  const canCall = currentUser.permissions.has('action:call_contract');
-  const [isCalling, setIsCalling] = useState(false);
-
-
-  const parsedParams = useMemo(() => {
-    const match = selectedMethod.match(/\(([^)]*)\)/);
-    if (match && match[1]) {
-      return match[1].split(',').map(p => p.trim()).filter(p => p);
-    }
-    return [];
-  }, [selectedMethod]);
-
-  useEffect(() => {
-    setParamValues(new Array(parsedParams.length).fill(''));
-  }, [parsedParams, selectedMethod]);
-
-  const handleParamChange = (index: number, value: string) => {
-    const newValues = [...paramValues];
-    newValues[index] = value;
-    setParamValues(newValues);
-  };
-
-  const handleCall = async () => {
-    setIsCalling(true);
-    await onCallMethod(contract.id, selectedMethod, paramValues);
-    setIsCalling(false);
-  };
-  
-  return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 flex flex-col">
-      <h3 className="text-lg font-bold text-white">{contract.name}</h3>
-      <p className="text-xs text-slate-500 font-mono mb-4">{contract.address}</p>
-      <div className="flex items-center gap-4 mb-4">
-        <div className="text-sm">
-          <p className="text-slate-400">Balance</p>
-          <p className="font-bold text-white">{contract.balance.toLocaleString()} BTR (Simulated)</p>
-        </div>
-      </div>
-      
-      <div className="space-y-3 mt-auto">
-        {/* Parameter Inputs */}
-        <div className="space-y-2">
-            {parsedParams.map((paramType, index) => (
-                <div key={index}>
-                     <label className="text-xs font-mono text-slate-400 block mb-1">{paramType}</label>
-                     <input
-                        type="text"
-                        value={paramValues[index] || ''}
-                        onChange={(e) => handleParamChange(index, e.target.value)}
-                        placeholder={`Enter ${paramType}`}
-                        className="w-full bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"
-                        disabled={!canCall || isCalling}
-                    />
-                </div>
-            ))}
-        </div>
-
-        {/* Method Selector and Call Button */}
-        <div className="flex items-stretch gap-2">
-            <select
-            value={selectedMethod}
-            onChange={e => setSelectedMethod(e.target.value)}
-            className="flex-grow bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
-            >
-            {contract.methods.map(method => <option key={method} value={method}>{method}</option>)}
-            </select>
-            <button
-            onClick={handleCall}
-            disabled={!canCall || isCalling}
-            className="bg-sky-600 text-white font-semibold rounded-md px-4 py-2 hover:bg-sky-500 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed"
-            >
-            {isCalling ? '...' : 'Call'}
-            </button>
-        </div>
-      </div>
-
-    </div>
-  );
-};
-
-const DeployContractCard: React.FC<{
-    onDeploy: (name: string, bytecode: string, initialState: string) => void;
-}> = ({ onDeploy }) => {
-    const [name, setName] = useState('');
-    const [bytecode, setBytecode] = useState('');
+const DeployContractForm: React.FC<{
+    onDeploy: (code: string, initialState?: Record<string, any>) => Promise<{ success: boolean, message: string }>;
+    canDeploy: boolean;
+}> = ({ onDeploy, canDeploy }) => {
+    const [code, setCode] = useState('');
     const [initialState, setInitialState] = useState('');
-    const { hasPermission } = useAuth();
-    const canDeploy = hasPermission('action:deploy_contract');
+    const [error, setError] = useState('');
     const [isDeploying, setIsDeploying] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (canDeploy && name && bytecode) {
-            setIsDeploying(true);
-            await onDeploy(name, bytecode, initialState);
-            setIsDeploying(false);
-            setName('');
-            setBytecode('');
+        setError('');
+        let parsedState;
+        try {
+            parsedState = initialState ? JSON.parse(initialState) : undefined;
+        } catch {
+            setError('Invalid JSON for initial state.');
+            return;
+        }
+        setIsDeploying(true);
+        const result = await onDeploy(code, parsedState);
+        if (!result.success) {
+            setError(result.message);
+        } else {
+            setCode('');
             setInitialState('');
         }
+        setIsDeploying(false);
     };
 
     return (
-        <div className="bg-slate-800/50 border-2 border-dashed border-slate-600 rounded-lg p-6 flex flex-col">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-                <FilePlusIcon />
-                Deploy New Contract
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <FilePlusIcon /> Deploy New Contract
             </h3>
-            <form onSubmit={handleSubmit} className="space-y-3 flex flex-col flex-grow">
-                 <input
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Contract Name (e.g., MyNFT)"
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    disabled={!canDeploy || isDeploying}
-                />
-                <textarea
-                    value={bytecode}
-                    onChange={e => setBytecode(e.target.value)}
-                    placeholder="Paste WASM bytecode (simulated)..."
-                    className="w-full flex-grow bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    disabled={!canDeploy || isDeploying}
-                />
-                 <textarea
-                    value={initialState}
-                    onChange={e => setInitialState(e.target.value)}
-                    placeholder='Initial State (JSON format), e.g., {"owner": "0x..."}'
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-500 h-20"
-                    disabled={!canDeploy || isDeploying}
-                />
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">WASM Code (Base64)</label>
+                    <textarea
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        placeholder="Paste base64-encoded WASM contract code..."
+                        className="w-full h-24 bg-slate-800 border border-slate-600 rounded-md p-2 font-mono text-xs"
+                        disabled={!canDeploy || isDeploying}
+                        required
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Initial State (JSON, optional)</label>
+                    <textarea
+                        value={initialState}
+                        onChange={(e) => setInitialState(e.target.value)}
+                        placeholder='{ "owner": "your_address", "counter": 0 }'
+                        className="w-full h-20 bg-slate-800 border border-slate-600 rounded-md p-2 font-mono text-xs"
+                        disabled={!canDeploy || isDeploying}
+                    />
+                </div>
+                {error && <p className="text-xs text-red-400">{error}</p>}
                 <button
                     type="submit"
-                    disabled={!canDeploy || !name || !bytecode || isDeploying}
-                    className="w-full bg-sky-600 text-white font-semibold rounded-md py-2.5 hover:bg-sky-500 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed mt-auto"
+                    disabled={!canDeploy || isDeploying || !code}
+                    className="bg-sky-600 text-white font-semibold rounded-md px-6 py-2 hover:bg-sky-500 transition disabled:bg-slate-600 disabled:cursor-not-allowed"
                 >
-                    {isDeploying ? 'Deploying...' : 'Deploy'}
+                    {isDeploying ? 'Deploying...' : 'Deploy Contract'}
                 </button>
-                 {!canDeploy && <p className="text-xs text-center text-yellow-400">Your role cannot deploy contracts.</p>}
             </form>
         </div>
     );
 };
 
-export const ContractView: React.FC<{ logAction: (action: string, details: Record<string, any>) => void }> = ({ logAction }) => {
-    const { contracts, interactions, callMethod, deployContract, isLoading } = useSmartContracts();
+const ContractCard: React.FC<{
+    contract: DeployedContract;
+    state: Record<string, any>;
+    onFetchState: (id: string) => void;
+    onCall: (id: string, func: string, args: any[]) => Promise<{ success: boolean, message: string }>;
+    canCall: boolean;
+}> = ({ contract, state, onFetchState, onCall, canCall }) => {
+    const [func, setFunc] = useState('');
+    const [args, setArgs] = useState('');
+    const [callError, setCallError] = useState('');
+    const [isCalling, setIsCalling] = useState(false);
 
-    const handleCallMethod = async (contractId: string, method: string, params: any[]) => {
-        const interaction = await callMethod(contractId, method, params);
-        if (interaction) {
-            const contract = contracts.find(c => c.id === contractId);
-            logAction('contract.call', {
-                contractName: contract?.name || 'Unknown',
-                method: method,
-                params: params,
-                result: interaction.result,
-            });
+    const memoizedFetchState = useCallback(() => {
+        onFetchState(contract.id);
+    }, [onFetchState, contract.id]);
+
+    useEffect(() => {
+        memoizedFetchState();
+    }, [memoizedFetchState]);
+
+    const handleCall = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setCallError('');
+        let parsedArgs;
+        try {
+            parsedArgs = args ? JSON.parse(args) : [];
+            if (!Array.isArray(parsedArgs)) throw new Error();
+        } catch {
+            setCallError('Arguments must be a valid JSON array.');
+            return;
         }
+        setIsCalling(true);
+        const result = await onCall(contract.id, func, parsedArgs);
+        if (!result.success) {
+            setCallError(result.message);
+        } else {
+            setFunc('');
+            setArgs('');
+        }
+        setIsCalling(false);
+    };
+
+    return (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+            <h4 className="text-lg font-bold text-white font-mono truncate">{contract.id}</h4>
+            <p className="text-xs text-slate-500 mb-4">Deployed by: <span className="font-mono">{contract.from}</span></p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h5 className="font-semibold text-slate-300 mb-2 flex items-center gap-2"><CubeIcon className="h-5 w-5"/> Current State</h5>
+                    <pre className="bg-slate-900 rounded p-2 text-xs h-32 overflow-auto">{JSON.stringify(state, null, 2)}</pre>
+                    <button onClick={() => onFetchState(contract.id)} className="text-xs text-sky-400 mt-2 hover:underline">Refresh State</button>
+                </div>
+                <div>
+                    <h5 className="font-semibold text-slate-300 mb-2 flex items-center gap-2"><PlayCircleIcon className="h-5 w-5"/> Call Function</h5>
+                    <form onSubmit={handleCall} className="space-y-2">
+                         <input type="text" value={func} onChange={e => setFunc(e.target.value)} placeholder="Function Name" className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm" disabled={!canCall || isCalling} required />
+                         <input type="text" value={args} onChange={e => setArgs(e.target.value)} placeholder='Arguments (JSON Array), e.g., ["key", 42]' className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm" disabled={!canCall || isCalling} />
+                         {callError && <p className="text-xs text-red-400">{callError}</p>}
+                         <button type="submit" className="w-full bg-indigo-600 text-white text-sm font-semibold rounded py-1.5 hover:bg-indigo-500 transition disabled:bg-slate-600" disabled={!canCall || isCalling || !func}>
+                            {isCalling ? 'Calling...' : 'Execute'}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const ContractView: React.FC<{ logAction: (action: string, details: Record<string, any>) => void }> = ({ logAction }) => {
+    const { contracts, contractStates, isLoading, fetchContractState, deployContract, callContract } = useSmartContracts();
+    const { hasPermission } = useAuth();
+    const canDeploy = hasPermission('action:deploy_contract');
+    const canCall = hasPermission('action:call_contract');
+
+    const handleDeploy = async (code: string, initialState?: Record<string, any>) => {
+        const result = await deployContract(code, initialState);
+        if (result.success) {
+            logAction('contract.deploy', { codeLength: code.length, hasInitialState: !!initialState });
+        }
+        return result;
     };
     
-    const handleDeployContract = async (name: string, bytecode: string, initialState: string) => {
-        const transaction = await deployContract(name, bytecode, initialState);
-        if (transaction) {
-            logAction('contract.deploy', {
-                contractName: name,
-                transactionId: transaction.id,
-            });
+    const handleCall = async (id: string, func: string, args: any[]) => {
+        const result = await callContract(id, func, args);
+        if (result.success) {
+            logAction('contract.call', { contractId: id, function: func, args });
         }
+        return result;
     };
-    
+
     return (
         <div>
             <div className="mb-6">
-                <h2 className="text-3xl font-bold text-white flex items-center gap-2"><CodeBracketIcon className="h-8 w-8" /> Smart Contract Interaction</h2>
-                <p className="text-slate-400">View deployed contracts and interact with their functions.</p>
-            </div>
-            
-            {isLoading && <div className="text-center p-8">Loading contracts from the blockchain...</div>}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                <DeployContractCard onDeploy={handleDeployContract} />
-                {contracts.map(contract => (
-                    <ContractCard key={contract.id} contract={contract} onCallMethod={handleCallMethod} />
-                ))}
+                <h2 className="text-3xl font-bold text-white flex items-center gap-2"><CodeBracketIcon className="h-8 w-8"/> Smart Contracts</h2>
+                <p className="text-slate-400">Deploy and interact with WASM smart contracts on the Bataranetwork.</p>
             </div>
 
-            <div>
-                <h3 className="text-2xl font-bold text-white mb-4">Recent Interactions</h3>
-                {interactions.length > 0 ? (
-                    <div className="space-y-4">
-                        {interactions.map(interaction => (
-                           <div key={interaction.id} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                                <div className="flex justify-between items-center mb-2">
-                                    <p className="font-bold text-sky-400 text-sm font-mono">
-                                        {contracts.find(c => c.id === interaction.contractId)?.name} -> {interaction.method}
-                                    </p>
-                                    <p className="text-xs text-slate-500">{interaction.timestamp}</p>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <CodeBlock title="Parameters" content={JSON.stringify(interaction.params, null, 2)} />
-                                    <CodeBlock title="Result (Broadcast Confirmation)" content={JSON.stringify(interaction.result, null, 2)} />
-                                </div>
-                           </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-1">
+                    <DeployContractForm onDeploy={handleDeploy} canDeploy={canDeploy} />
+                </div>
+                <div className="lg:col-span-2">
+                    <h3 className="text-xl font-bold text-white mb-4">Deployed Contracts</h3>
+                    {isLoading && <p className="text-slate-400">Loading contracts...</p>}
+                    <div className="space-y-6">
+                         {contracts.map(contract => (
+                            <ContractCard 
+                                key={contract.id} 
+                                contract={contract} 
+                                state={contractStates[contract.id] || {}}
+                                onFetchState={fetchContractState}
+                                onCall={handleCall}
+                                canCall={canCall}
+                            />
                         ))}
+                        {!isLoading && contracts.length === 0 && <p className="text-slate-500 text-center p-8">No smart contracts have been deployed.</p>}
                     </div>
-                ) : (
-                    <div className="text-center p-8 bg-slate-800/50 border border-slate-700 rounded-lg">
-                        <p className="text-slate-400">No contract interactions yet. Call a method on a contract above.</p>
-                    </div>
-                )}
+                </div>
             </div>
         </div>
     );

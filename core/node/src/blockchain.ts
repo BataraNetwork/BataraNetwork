@@ -9,6 +9,11 @@ import { WasmEngine } from './vm/wasmEngine';
 import { GovernanceModule } from './governance/governanceModule';
 import { StateManager } from './state/stateManager';
 
+/**
+ * The Blockchain class orchestrates the core logic of the chain itself.
+ * It is responsible for managing the sequence of blocks, processing transactions within those blocks,
+ * and ensuring the integrity of the chain through validation.
+ */
 export class Blockchain {
   private latestBlock!: Block; // Initialized in initialize()
 
@@ -21,6 +26,10 @@ export class Blockchain {
     private stateManager: StateManager,
   ) {}
 
+  /**
+   * Initializes the blockchain by loading the latest block from storage or creating a genesis block if none exists.
+   * This method must be called before any other blockchain operations are performed.
+   */
   public async initialize(): Promise<void> {
     const latest = await this.storage.getLatestBlock();
     if (latest) {
@@ -59,7 +68,8 @@ export class Blockchain {
   }
   
   /**
-   * Processes a single transaction, updating the appropriate state machine (staking, governance, VM, state).
+   * Processes a single transaction, delegating state changes to the appropriate module (StateManager, WasmEngine, etc.).
+   * This is the central point for applying transaction logic to the world state.
    * @param transaction The transaction to process.
    * @returns A boolean indicating if the transaction was processed successfully.
    */
@@ -135,6 +145,12 @@ export class Blockchain {
     return this.stakingManager.selectNextValidator(this.latestBlock.height);
   }
 
+  /**
+   * Validates and adds a new block to the blockchain.
+   * This involves checking the block's height, hash, signature, validator, and processing all its transactions.
+   * @param block The block to add.
+   * @returns A boolean indicating if the block was successfully added.
+   */
   public async addBlock(block: Block): Promise<boolean> {
     // 1. Basic validation (height and previous hash)
     if (block.height !== this.latestBlock.height + 1) {

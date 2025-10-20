@@ -31,22 +31,22 @@ const Transactions: React.FC = () => {
   return (
     <div>
       <h2 className="text-3xl font-bold mb-6">Pending Transactions</h2>
-      <div className="bg-gray-800 rounded-lg shadow-lg overflow-x-auto">
+      <div className="bg-slate-800/50 border border-slate-700 rounded-lg shadow-lg overflow-x-auto">
         <table className="min-w-full">
-          <thead className="bg-gray-700/50">
+          <thead className="bg-slate-800">
             <tr>
-              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">Transaction ID</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">From</th>
-              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-300">To</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-300">Amount (BTR)</th>
-              <th className="py-3 px-4 text-right text-sm font-semibold text-gray-300">Fee (BTR)</th>
+              <th className="py-3 px-4 text-left text-sm font-semibold text-slate-400">Transaction ID</th>
+              <th className="py-3 px-4 text-left text-sm font-semibold text-slate-400">From</th>
+              <th className="py-3 px-4 text-left text-sm font-semibold text-slate-400">To</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-slate-400">Amount (BTR)</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-slate-400">Fee (BTR)</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-700">
+          <tbody className="divide-y divide-slate-700">
             {transactions.map(tx => (
-              <tr key={tx.id} className="hover:bg-gray-700/50 transition-colors">
+              <tr key={tx.id} className="hover:bg-slate-800/50 transition-colors">
                 <td className="py-3 px-4 font-mono text-sm truncate" style={{ maxWidth: '200px' }}>
-                  <Link to={`/tx/${tx.id}`} className="text-blue-400 hover:underline">
+                  <Link to={`/tx/${tx.id}`} className="text-sky-400 hover:underline">
                     {tx.id}
                   </Link>
                 </td>
@@ -59,7 +59,7 @@ const Transactions: React.FC = () => {
           </tbody>
         </table>
         {transactions.length === 0 && (
-            <div className="text-center p-8 text-gray-500">
+            <div className="text-center p-8 text-slate-500">
                 <p>No pending transactions found in the mempool.</p>
             </div>
         )}

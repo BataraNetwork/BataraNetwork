@@ -1,3 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+    @apply bg-slate-900 text-slate-300;
+    background-image: radial-gradient(circle at 1px 1px, #334155 1px, transparent 0);
+    background-size: 20px 20px;
+}

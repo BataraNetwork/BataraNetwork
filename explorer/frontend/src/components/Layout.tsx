@@ -1,22 +1,16 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Header } from './Header';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <div className="flex h-screen bg-gray-900 text-white">
-      <aside className="w-64 flex-shrink-0 bg-gray-800 p-4">
-        <h1 className="text-2xl font-bold mb-8">Batara Explorer</h1>
-        <nav>
-          <ul>
-            <li><Link to="/" className="block py-2 px-4 rounded hover:bg-gray-700">Dashboard</Link></li>
-            <li><Link to="/blocks" className="block py-2 px-4 rounded hover:bg-gray-700">Blocks</Link></li>
-            <li><Link to="/transactions" className="block py-2 px-4 rounded hover:bg-gray-700">Transactions</Link></li>
-          </ul>
-        </nav>
-      </aside>
-      <main className="flex-1 p-8 overflow-y-auto">
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 container mx-auto px-4 py-8">
         {children}
       </main>
+      <footer className="py-4 text-center text-xs text-slate-600 border-t border-slate-800">
+        Bataranetwork Explorer | A decentralized world is a better world.
+      </footer>
     </div>
   );
 };

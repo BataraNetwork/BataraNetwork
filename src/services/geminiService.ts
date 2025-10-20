@@ -1,3 +1,4 @@
+
 import { GeneratedFile, SecurityFinding, Alert, LogEntry, NodeStatus } from '../types';
 
 export interface GenerateOptions {
@@ -49,6 +50,29 @@ export const analyzeConfiguration = async (content: string): Promise<SecurityFin
 
   return response.json();
 };
+
+/**
+ * Calls the backend API to analyze and refactor a configuration file.
+ * @param content - The string content of the configuration file to refactor.
+ * @returns A promise that resolves to an object with an explanation and the refactored code.
+ */
+export const refactorConfiguration = async (content: string): Promise<{ explanation: string; refactoredCode: string }> => {
+  const response = await fetch('/api/refactor', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+    throw new Error(errorData.error || `Request failed with status ${response.status}`);
+  }
+
+  return response.json();
+};
+
 
 /**
  * Calls the backend API to generate an AI-powered remediation plan for an alert.

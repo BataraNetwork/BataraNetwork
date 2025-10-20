@@ -1,27 +1,66 @@
-
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-// This URL should point to the Bataranetwork node's HTTP RPC
 const NODE_API_URL = process.env.NODE_API_URL || 'http://localhost:3000';
 
 app.use(cors());
 app.use(express.json());
 
-// Create an Axios instance to communicate with the node
 const nodeApiClient = axios.create({
   baseURL: NODE_API_URL,
 });
 
-// A simple root endpoint for the API to confirm it's running
 app.get('/api', (req, res) => {
   res.json({ message: 'Welcome to the Bataranetwork Explorer API' });
 });
 
-// Proxy endpoint for the node's status
+// --- SEARCH ---
+app.get('/api/search/:query', async (req, res) => {
+    const { query } = req.params;
+    
+    // 1. Is it a number? (Block height)
+    if (!isNaN(parseInt(query, 10))) {
+        try {
+            await nodeApiClient.get(`/block/${query}`);
+            return res.json({ type: 'block', value: query });
+        } catch (error) {
+            // Not a block, continue to next check
+        }
+    }
+    
+    // 2. Is it a 64-char hex string? (Transaction ID)
+    if (query.length === 64 && /^[0-9a-fA-F]+$/.test(query)) {
+        try {
+            const { data: pendingTxs } = await nodeApiClient.get('/transactions/pending');
+            const transaction = pendingTxs.find((tx) => tx.id === query);
+            if (transaction) {
+                return res.json({ type: 'transaction', value: query });
+            }
+            // If not in mempool, it might be in a block, but we can't search that yet.
+        } catch (error) {
+           // continue
+        }
+    }
+
+    // 3. Is it a PEM public key? (Address)
+    if (query.startsWith('-----BEGIN PUBLIC KEY-----')) {
+       try {
+           await nodeApiClient.get(`/account/${encodeURIComponent(query)}`);
+           return res.json({ type: 'address', value: query });
+       } catch (error) {
+           // continue
+       }
+    }
+
+    res.status(404).json({ error: 'Not found. Please search by block height, transaction hash, or full PEM address.' });
+});
+
+
+// --- PROXY ENDPOINTS ---
+
 app.get('/api/status', async (req, res) => {
   try {
     const { data } = await nodeApiClient.get('/status');
@@ -32,10 +71,8 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
-// Proxy and adapt the endpoint to get latest blocks
 app.get('/api/blocks', async (req, res) => {
   try {
-    // The frontend asks for `limit`, the node provides `count`. We can map this.
     const count = req.query.limit || 10;
     const { data } = await nodeApiClient.get(`/blocks/latest?count=${count}`);
     res.json(data);
@@ -45,7 +82,6 @@ app.get('/api/blocks', async (req, res) => {
   }
 });
 
-// Proxy endpoint to get a single block by height
 app.get('/api/block/:height', async (req, res) => {
   try {
     const { height } = req.params;
@@ -61,7 +97,6 @@ app.get('/api/block/:height', async (req, res) => {
   }
 });
 
-// Proxy endpoint for pending transactions from the mempool
 app.get('/api/transactions', async (req, res) => {
   try {
     const { data } = await nodeApiClient.get('/transactions/pending');
@@ -72,7 +107,6 @@ app.get('/api/transactions', async (req, res) => {
   }
 });
 
-// Endpoint to find a single transaction by its ID from the mempool
 app.get('/api/transaction/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -81,7 +115,6 @@ app.get('/api/transaction/:id', async (req, res) => {
     if (transaction) {
       res.json(transaction);
     } else {
-      // It's possible the tx is already in a block. This endpoint only checks the mempool.
       res.status(404).json({ error: `Transaction with ID ${id} not found in the mempool.` });
     }
   } catch (error) {
@@ -89,6 +122,18 @@ app.get('/api/transaction/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch transaction.' });
   }
 });
+
+app.get('/api/account/:address', async (req, res) => {
+    try {
+        const { address } = req.params;
+        const { data } = await nodeApiClient.get(`/account/${encodeURIComponent(address)}`);
+        res.json(data);
+    } catch (error) {
+        console.error(`Error fetching account: ${error.message}`);
+        res.status(500).json({ error: 'Failed to fetch account details.' });
+    }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Explorer backend is running on http://localhost:${PORT}`);

@@ -5,7 +5,17 @@ import { nodeService } from '../services/nodeService';
 // This is now just a static definition for the UI, real data comes from backend.
 const MOCK_NODE_META = { id: 'node-live-1', name: 'Primary Node', region: 'local', peers: 0 };
 
-
+/**
+ * A React hook for fetching and managing the real-time status of the Bataranetwork node.
+ * It polls the backend node's `/status` endpoint at a regular interval to provide live updates.
+ *
+ * @returns An object containing:
+ * - `status`: The latest `NodeStatus` object with live metrics.
+ * - `alerts`: An array of active and resolved alerts (currently simulated).
+ * - `history`: A time-series array of recent metrics for charting.
+ * - `isLoading`: A boolean indicating if the initial fetch is in progress.
+ * - `error`: A string containing any error message from failing to connect to the node.
+ */
 export const useNodeStatus = () => {
   const [status, setStatus] = useState<NodeStatus | undefined>(undefined);
   const [alerts, setAlerts] = useState<Alert[]>([]);
